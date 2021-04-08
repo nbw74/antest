@@ -10,7 +10,7 @@ readonly ANTEST_PROJECT_DIR="${HOME}/projects/nbw74/antest"
 
 readonly bn="$(basename "$0")"
 
-typeset -i err_warn=0
+typeset -i err_warn=0 KEEP_RUNNING=0
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -18,7 +18,7 @@ main() {
     trap 'except $LINENO' ERR
 
     local ansible_rolename=${PWD##*/}
-    local ansible_network_name="ansible-test-$ansible_rolename"
+    local ansible_network_name="ansible-test-podman"
     local ansible_target_container="ansible-test-$ansible_rolename"
 
     export ANSIBLE_ROLES_PATH="${PWD%/*}"
@@ -62,13 +62,15 @@ main() {
     echo_info "Run ansible playbook (II)"
     _run
 
-    echo_info "Stop container '$ansible_target_container'"
-    podman stop "$ansible_target_container"
-    echo_info "Remove container '$ansible_target_container'"
-    podman rm "$ansible_target_container"
+    if (( ! KEEP_RUNNING )); then
+	echo_info "Stop container '$ansible_target_container'"
+	podman stop "$ansible_target_container"
+	echo_info "Remove container '$ansible_target_container'"
+	podman rm "$ansible_target_container"
 
-    echo_info "Remove network $ansible_network_name"
-    podman network rm "$ansible_network_name"
+	echo_info "Remove network $ansible_network_name"
+	podman network rm "$ansible_network_name"
+    fi
 }
 
 _run() {
@@ -76,7 +78,7 @@ _run() {
 
     ansible-playbook tests/antest/site.yml -b --diff -u ansible \
 	--private-key "${ANTEST_PROJECT_DIR}/id_ed25519" \
-	-i tests/antest/inventory \
+	-i tests/antest/inventory/hosts \
 	-e ansible_ssh_port=2222
 }
 
@@ -112,6 +114,35 @@ except() {
 	exit $ret
     fi
 }
+
+usage() {
+    echo -e "\\n    Usage: $bn [OPTION]\\n
+    Options:
+
+    -k, --keep-running		do not stop containers
+    -h, --help			print help
+"
+}
+# Getopts
+getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
+
+if ! TEMP=$(getopt -o kh --longoptions keep-running,help -n "$bn" -- "$@")
+then
+    echo "Terminating..." >&2
+    exit 1
+fi
+
+eval set -- "$TEMP"
+unset TEMP
+
+while true; do
+    case $1 in
+	-k|--keep-running)	KEEP_RUNNING=1 ;	shift	;;
+	-h|--help)		usage ;		exit 0	;;
+	--)			shift ;		break	;;
+	*)			usage ;		exit 1
+    esac
+done
 
 echo_err()      { tput bold; tput setaf 7; echo "* ERROR: $*" ;   tput sgr0;   }
 echo_fatal()    { tput bold; tput setaf 1; echo "* FATAL: $*" ;   tput sgr0;   }

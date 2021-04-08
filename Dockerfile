@@ -6,7 +6,7 @@ WORKDIR /root
 
 # hadolint ignore=DL3033
 RUN set -eux; \
-    yum -y install openssh-server sudo; \
+    yum -y install bash-completion openssh-server sudo; \
     yum -y clean all
 
 RUN set -eux; \
@@ -23,6 +23,5 @@ COPY --chown=ansible:ansible id_ed25519.pub /home/ansible/.ssh/authorized_keys
 RUN set -eux; \
     chmod 0600 /home/ansible/.ssh/authorized_keys
 
-# CMD ["/usr/sbin/sshd", "-4Dp2222"]
 CMD ["/sbin/init"]
 
