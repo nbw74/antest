@@ -86,15 +86,16 @@
               - "{{ runner_home }}/config:/etc/gitlab-runner"
             state: "{{ run_gitlab_state }}"
           register: __run_gitlab_runner_return
-
-        - name: Wait for GitLab API is ready
-          uri:
-            url: http://localhost/-/readiness
-          register: __run_gitlab_readiness
-          until: __run_gitlab_readiness.status|int == 200
-          retries: 200
-          delay: 5
       when: run_gitlab_state in [ 'started', 'stopped' ]
+
+    - name: Wait for GitLab API is ready
+      uri:
+        url: http://localhost/-/readiness
+      register: __run_gitlab_readiness
+      until: __run_gitlab_readiness.status|int == 200
+      retries: 200
+      delay: 5
+      when: run_gitlab_state in [ 'started' ]
 
     - name: Registration block
       block:
