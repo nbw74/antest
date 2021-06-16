@@ -10,7 +10,8 @@ readonly ANTEST_PROJECT_DIR="${HOME}/projects/nbw74/antest"
 
 readonly bn="$(basename "$0")"
 
-typeset -i err_warn=0 KEEP_RUNNING=0
+typeset -i err_warn=0 KEEP_RUNNING=0 POD_SSH_PORT=2222
+typeset PUBLISH_HTTP=""
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -21,7 +22,7 @@ main() {
     local ansible_network_name="ansible-test-podman"
     local ansible_target_container="ansible-test-$ansible_rolename"
 
-    export ANSIBLE_ROLES_PATH="${PWD%/*}"
+    export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
     export ANSIBLE_HOST_KEY_CHECKING="false"
     export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
 
@@ -39,11 +40,11 @@ main() {
     if ! inArray ContainersAll "$ansible_target_container"; then
 	echo_info "Run container $ansible_target_container"
 	podman run -d \
+	    --privileged \
 	    --name="$ansible_target_container" \
 	    --network="$ansible_network_name" \
-	    --publish "127.0.0.1:80:80" \
-	    --publish "127.0.0.1:443:443" \
-	    --publish "127.0.0.1:2222:2222" \
+	    $PUBLISH_HTTP \
+	    --publish "127.0.0.1:${POD_SSH_PORT}:${POD_SSH_PORT}" \
 	    "localhost/antest:centos-$CENTOS_VERSION"
     fi
 
@@ -78,10 +79,15 @@ main() {
 _run() {
     local fn=${FUNCNAME[0]}
 
+    if [[ -f requirements.yml ]]; then
+	ansible-galaxy install -r requirements.yml 2>&1 | grep -F -- 'use --force' \
+	    && ansible-galaxy install -r requirements.yml --force
+    fi
+
     ansible-playbook tests/antest/site.yml -b --diff -u ansible \
 	--private-key "${ANTEST_PROJECT_DIR}/id_ed25519" \
-	-i tests/antest/inventory/hosts \
-	-e ansible_ssh_port=2222
+	-i tests/antest/inventory/hosts.yml \
+	-e ansible_ssh_port=${POD_SSH_PORT}
 }
 
 inArray() {
@@ -121,6 +127,8 @@ usage() {
     echo -e "\\n    Usage: $bn [OPTION]\\n
     Options:
 
+    -a, --ssh-port <int>	set SSH port (default: 2222)
+    -H, --publish-http		publish HTTP(S) ports
     -k, --keep-running		do not stop containers
     -h, --help			print help
 "
@@ -128,7 +136,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o kh --longoptions keep-running,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:Hkh --longoptions ansible-port:,no-publish-http,keep-running,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -139,10 +147,18 @@ unset TEMP
 
 while true; do
     case $1 in
-	-k|--keep-running)	KEEP_RUNNING=1 ;	shift	;;
-	-h|--help)		usage ;		exit 0	;;
-	--)			shift ;		break	;;
-	*)			usage ;		exit 1
+	-a|--ssh-port)
+	    POD_SSH_PORT=$2 ;	shift 2	;;
+	-H|--publish-http)
+	    PUBLISH_HTTP='--publish "127.0.0.1:80:80" --publish "127.0.0.1:443:443"' ;	shift	;;
+	-k|--keep-running)
+	    KEEP_RUNNING=1 ;	shift	;;
+	-h|--help)
+	    usage ;		exit 0	;;
+	--)
+	    shift ;		break	;;
+	*)
+	    usage ;		exit 1
     esac
 done
 

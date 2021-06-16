@@ -6,7 +6,7 @@ WORKDIR /root
 
 # hadolint ignore=DL3033
 RUN set -eux; \
-    yum -y install bash-completion openssh-server sudo; \
+    yum -y install bash-completion openssh-server sudo iproute brctl; \
     yum -y clean all
 
 RUN set -eux; \
