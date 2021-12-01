@@ -4,9 +4,19 @@ FROM docker.io/centos:$CENTOS_VERSION
 
 WORKDIR /root
 
+ARG PYTHON_VERSION=0
+
 # hadolint ignore=DL3033
 RUN set -eux; \
-    yum -y install bash-completion openssh-server sudo iproute brctl; \
+    yum -y install epel-release; \
+    yum -y install \
+	bash-completion \
+	iproute \
+	openssh-server \
+	python$PYTHON_VERSION \
+	sudo \
+	tcping \
+	; \
     yum -y clean all
 
 RUN set -eux; \
