@@ -17,8 +17,8 @@ main() {
 
     trap 'except $LINENO' ERR
 
-#     echo_info "Testing Dockerfile with latest hadolint"
-#     podman run --rm -i ghcr.io/hadolint/hadolint < "${dn}/Dockerfile"
+    echo_info "Testing Dockerfile with latest hadolint"
+    podman run --rm -i ghcr.io/hadolint/hadolint < "${dn}/Dockerfile"
 
     if [[ ! -f "${dn}/id_ed25519" ]]; then
 	echo_info "Generate SSH key pair"
@@ -26,9 +26,7 @@ main() {
     fi
 
     CENTOS_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
-    CENTOS_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=3 _build_centos
     CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=36 _build_centos
-    CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=38 _build_centos
 
 }
 
@@ -38,7 +36,7 @@ _build_centos() {
     echo_info "Build CentOS $CENTOS_VERSION image with Python$PYTHON_VERSION and openssh-server"
     buildah bud \
 	-f "${dn}/Dockerfile" \
-	-t antest:centos-${CENTOS_VERSION}-$PYTHON_VERSION \
+	-t antest:centos-${CENTOS_VERSION%%.*} \
 	--build-arg=CENTOS_VERSION=$CENTOS_VERSION \
 	--build-arg=PYTHON_VERSION=$PYTHON_VERSION \
 	"$dn"

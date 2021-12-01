@@ -4,10 +4,11 @@ FROM docker.io/centos:$CENTOS_VERSION
 
 WORKDIR /root
 
-ARG PYTHON_VERSION=0
+ARG PYTHON_VERSION
 
 # hadolint ignore=DL3033
 RUN set -eux; \
+    yum -y update; \
     yum -y install epel-release; \
     yum -y install \
 	bash-completion \

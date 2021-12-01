@@ -202,10 +202,8 @@ usage() {
     -k, --keep-running		do not stop containers
     -V, --centos-version	image tag; available tags:
 
-				    7.9.2009-2
-				    7.9.2009-3
-				    8.4.2105-36
-				    8.4.2105-38
+				    7
+				    8
 
     -h, --help			print help
 "
