@@ -11,7 +11,7 @@ readonly BIN_REQUIRED="podman"
 readonly bn="$(basename "$0")"
 
 typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=0 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0
-typeset PUBLISH_HTTP="" CENTOS_VERSION=""
+typeset PUBLISH_HTTP="" CENTOS_VERSION="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -107,9 +107,9 @@ _run() {
 	    && ansible-galaxy install -r requirements.yml --force
     fi
 
-    ansible-playbook tests/antest/site.yml -b --diff -u ansible \
+    ansible-playbook $PLAYBOOK -b --diff -u ansible \
 	--private-key "${ANTEST_PROJECT_DIR}/id_ed25519" \
-	-i tests/antest/inventory/hosts.yml
+	-i "$INVENTORY"
 }
 
 _stop() {
@@ -196,6 +196,8 @@ usage() {
 
     -a, --ssh-port <int>	set SSH port (default: 2222)
     -c, --instanes <int>	make several instances
+    -i, --inventory <path>	alternative inventory (default is tests/antest/inventory/hosts.yml)
+    -p, --playbook <path>	alternative playbook (default is tests/antest/site.yml)
     -H, --publish-http		publish HTTP(S) ports
     -s, --stop			stop containers
     -R, --remove		remove containers
@@ -211,7 +213,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:c:HksRV:h --longoptions ansible-port:,instances:,publish-http,keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:c:i:p:HksRV:h --longoptions ansible-port:,instances:,inventory:,playbook:,publish-http,keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -226,6 +228,10 @@ while true; do
 	    POD_SSH_PORT=$2 ;	shift 2	;;
 	-c|--instances)
 	    INSTANCES=$2 ;	shift 2	;;
+	-i|--inventory)
+	    INVENTORY=$2 ;	shift 2	;;
+	-p|--playbook)
+	    PLAYBOOK=$2 ;	shift 2	;;
 	-H|--publish-http)
 	    PUBLISH_HTTP='--publish "0.0.0.0:80:80" --publish "0.0.0.0:443:443"' ;	shift	;;
 	-k|--keep-running)
