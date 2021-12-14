@@ -10,7 +10,7 @@ readonly BIN_REQUIRED="podman"
 
 readonly bn="$(basename "$0")"
 
-typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=0 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0
+typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0
 typeset PUBLISH_HTTP="" CENTOS_VERSION="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 main() {
@@ -201,7 +201,7 @@ usage() {
     -H, --publish-http		publish HTTP(S) ports
     -s, --stop			stop containers
     -R, --remove		remove containers
-    -k, --keep-running		do not stop containers
+    -K, --no-keep-running	stop containers after double plays
     -V, --centos-version	image tag; available tags:
 
 				    7
@@ -213,7 +213,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:c:i:p:HksRV:h --longoptions ansible-port:,instances:,inventory:,playbook:,publish-http,keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:c:i:p:HKsRV:h --longoptions ansible-port:,instances:,inventory:,playbook:,publish-http,no-keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -234,7 +234,7 @@ while true; do
 	    PLAYBOOK=$2 ;	shift 2	;;
 	-H|--publish-http)
 	    PUBLISH_HTTP='--publish "0.0.0.0:80:80" --publish "0.0.0.0:443:443"' ;	shift	;;
-	-k|--keep-running)
+	-K|--no-keep-running)
 	    KEEP_RUNNING=1 ;	shift	;;
 	-s|--stop)
 	    ACT_STOP=1 ;	shift	;;
