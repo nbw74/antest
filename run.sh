@@ -10,8 +10,10 @@ readonly BIN_REQUIRED="podman"
 
 readonly bn="$(basename "$0")"
 
-typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0
+typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11
 typeset PUBLISH_HTTP="" CENTOS_VERSION="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
+
+readonly CONTAINER_SSH_PORT=$POD_SSH_PORT
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -58,13 +60,14 @@ _create() {
 	[[ -n "$PUBLISH_HTTP" && $c -gt 1 ]] && PUBLISH_HTTP=""
 
 	if ! inArray ContainersAll "$_target"; then
-	    echo_info "Run container $_target"
+	    local publish="127.0.0.$(( START_OCTET + c - 1 )):$(( POD_SSH_PORT + c - 1 )):${CONTAINER_SSH_PORT}"
+	    echo_info "Run container $_target with publish $publish"
 	    podman run -d \
 		--privileged \
 		--name="$_target" \
 		--network="$ansible_network_name" \
 		$PUBLISH_HTTP \
-		--publish "127.0.0.1${c}:$(( POD_SSH_PORT + c - 1 )):${POD_SSH_PORT}" \
+		--publish "$publish" \
 		"localhost/antest:centos-$CENTOS_VERSION"
 	fi
     done
@@ -197,6 +200,7 @@ usage() {
     -a, --ssh-port <int>	set SSH port (default: 2222)
     -c, --instanes <int>	make several instances
     -i, --inventory <path>	alternative inventory (default is tests/antest/inventory/hosts.yml)
+    -I, --start-ip <int>	start from this IP address' last octet (default is 11)
     -p, --playbook <path>	alternative playbook (default is tests/antest/site.yml)
     -H, --publish-http		publish HTTP(S) ports
     -s, --stop			stop containers
@@ -213,7 +217,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:c:i:p:HKsRV:h --longoptions ansible-port:,instances:,inventory:,playbook:,publish-http,no-keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:c:i:I:p:HKsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,publish-http,no-keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -230,6 +234,8 @@ while true; do
 	    INSTANCES=$2 ;	shift 2	;;
 	-i|--inventory)
 	    INVENTORY=$2 ;	shift 2	;;
+	-I|--start-ip)
+	    START_OCTET=$2 ;	shift 2	;;
 	-p|--playbook)
 	    PLAYBOOK=$2 ;	shift 2	;;
 	-H|--publish-http)
