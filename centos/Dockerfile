@@ -8,15 +8,12 @@ ARG PYTHON_VERSION
 
 # hadolint ignore=DL3033
 RUN set -eux; \
-    yum -y update; \
-    yum -y install epel-release; \
     yum -y install \
 	bash-completion \
 	iproute \
 	openssh-server \
 	python$PYTHON_VERSION \
 	sudo \
-	tcping \
 	; \
     yum -y clean all
 

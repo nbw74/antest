@@ -8,10 +8,12 @@ readonly PODMAN_SUBNET=10.25.11.0/24
 readonly ANTEST_PROJECT_DIR="${HOME}/projects/nbw74/antest"
 readonly BIN_REQUIRED="podman"
 
-readonly bn="$(basename "$0")"
+typeset bn=""
+bn="$(basename "$0")"
+readonly bn
 
-typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11
-typeset PUBLISH_HTTP="" CENTOS_VERSION="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
+typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0
+typeset PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 readonly CONTAINER_SSH_PORT=$POD_SSH_PORT
 
@@ -21,12 +23,28 @@ main() {
     trap 'except $LINENO' ERR
 
     local ansible_rolename=${PWD##*/}
+    local ansible_rolename_norm=${ansible_rolename//_/-}
     local ansible_network_name="ansible-test-podman"
-    local ansible_target_container="$ansible_rolename"
+    local ansible_target_container="${NAME_PREFIX:-$ansible_rolename_norm}"
 
     if [[ $ACT_STOP == 0 && $ACT_REMOVE == 0 ]]; then
-	checks
-	_create
+
+	if (( ! NO_CREATE )); then
+	    checks
+	    _create
+	fi
+
+	echo_info "Run ansible playbook (I)"
+	_run
+	read -rp "Press key to continue for second pass... " -n1 -s
+	echo
+	echo_info "Run ansible playbook (II)"
+	_run
+
+	if (( ! KEEP_RUNNING )); then
+	    _stop
+	    _rm
+	fi
     else
 	_stop
 
@@ -38,10 +56,6 @@ main() {
 
 _create() {
     local fn=${FUNCNAME[0]}
-
-    export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
-    export ANSIBLE_HOST_KEY_CHECKING="false"
-    export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
 
     local -a ContainersAll=() ContainersRunning=() Networks=()
     # shellcheck disable=SC2034
@@ -68,7 +82,7 @@ _create() {
 		--network="$ansible_network_name" \
 		$PUBLISH_HTTP \
 		--publish "$publish" \
-		"localhost/antest:centos-$CENTOS_VERSION"
+		"localhost/$USED_IMAGE"
 	fi
     done
 
@@ -83,27 +97,14 @@ _create() {
 	    podman start "$_target"
 	fi
     done
-
-    echo_info "Run ansible playbook (I)"
-    _run
-
-    read -rp "Press key to continue for second pass... " -n1 -s
-
-    echo
-    echo_info "Run ansible playbook (II)"
-    _run
-
-    if (( ! KEEP_RUNNING )); then
-	_stop
-	_rm
-
-# 	echo_info "Remove network $ansible_network_name"
-# 	podman network rm "$ansible_network_name"
-    fi
 }
 
 _run() {
     local fn=${FUNCNAME[0]}
+
+    export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
+    export ANSIBLE_HOST_KEY_CHECKING="false"
+    export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
 
     if [[ -f requirements.yml ]]; then
 	ansible-galaxy install -r requirements.yml 2>&1 | grep -F -- 'use --force' \
@@ -173,8 +174,8 @@ checks() {
         fi
     done
 
-    if [[ ${CENTOS_VERSION:-nop} == "nop" ]]; then
-	echo "Required parameter '--centos-version' is missing" >&2
+    if [[ ${USED_IMAGE:-nop} == "nop" ]]; then
+	echo "Required parameter '--used-image' is missing" >&2
 	false
     fi
 }
@@ -198,18 +199,21 @@ usage() {
     Options:
 
     -a, --ssh-port <int>	set SSH port (default: 2222)
-    -c, --instanes <int>	make several instances
+    -c, --instances <int>	make several instances
     -i, --inventory <path>	alternative inventory (default is tests/antest/inventory/hosts.yml)
     -I, --start-ip <int>	start from this IP address' last octet (default is 11)
     -p, --playbook <path>	alternative playbook (default is tests/antest/site.yml)
+    -n, --prefix <string>	container name prefix (default is current directory name)
     -H, --publish-http		publish HTTP(S) ports
     -s, --stop			stop containers
     -R, --remove		remove containers
     -K, --no-keep-running	stop containers after double plays
-    -V, --centos-version	image tag; available tags:
+    -N, --no-create		don't create containers (just run ansible on existing container)
+    -V, --used-image		available images:
 
-				    7
-				    8
+				    antools:centos-7
+				    antools:centos-8
+				    antools:amzn-2
 
     -h, --help			print help
 "
@@ -217,7 +221,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:c:i:I:p:HKsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,publish-http,no-keep-running,stop,remove,centos-version,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:c:i:I:p:n:HKNsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-http,no-keep-running,no-create,stop,remove,used-image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -238,16 +242,20 @@ while true; do
 	    START_OCTET=$2 ;	shift 2	;;
 	-p|--playbook)
 	    PLAYBOOK=$2 ;	shift 2	;;
+	-n|--prefix)
+	    NAME_PREFIX=$2 ;	shift 2	;;
 	-H|--publish-http)
 	    PUBLISH_HTTP='--publish "0.0.0.0:80:80" --publish "0.0.0.0:443:443"' ;	shift	;;
 	-K|--no-keep-running)
 	    KEEP_RUNNING=1 ;	shift	;;
+	-N|--no-create)
+	    NO_CREATE=1 ;	shift	;;
 	-s|--stop)
 	    ACT_STOP=1 ;	shift	;;
 	-R|--remove)
 	    ACT_REMOVE=1 ;	shift	;;
-	-V|--centos-version)
-	    CENTOS_VERSION=$2 ;	shift 2	;;
+	-V|--used-image)
+	    USED_IMAGE=$2 ;	shift 2	;;
 	-h|--help)
 	    usage ;		exit 0	;;
 	--)

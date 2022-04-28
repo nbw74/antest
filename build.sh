@@ -5,20 +5,20 @@ set -o errtrace
 set -o pipefail
 
 readonly CENTOS_7_VERSION=7.9.2009
-readonly CENTOS_8_VERSION=8.4.2105
+# readonly CENTOS_8_VERSION=8.4.2105
+readonly AMAZONLINUX_VERSION=2
 
 export BUILDAH_LAYERS=true
 
-readonly bn="$(basename "$0")"
-readonly dn="$(dirname "$0")"
+typeset bn="" dn=""
+bn="$(basename "$0")"
+dn="$(dirname "$0")"
+readonly bn dn
 
 main() {
     local fn=${FUNCNAME[0]}
 
     trap 'except $LINENO' ERR
-
-    echo_info "Testing Dockerfile with latest hadolint"
-    podman run --rm -i ghcr.io/hadolint/hadolint < "${dn}/Dockerfile"
 
     if [[ ! -f "${dn}/id_ed25519" ]]; then
 	echo_info "Generate SSH key pair"
@@ -26,19 +26,33 @@ main() {
     fi
 
     CENTOS_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
-    CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=36 _build_centos
+#     CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=36 _build_centos
+    _build_amazonlinux
 
 }
 
 _build_centos() {
     local fn=${FUNCNAME[0]}
 
+    # shellcheck disable=SC2153
     echo_info "Build CentOS $CENTOS_VERSION image with Python$PYTHON_VERSION and openssh-server"
     buildah bud \
-	-f "${dn}/Dockerfile" \
-	-t antest:centos-${CENTOS_VERSION%%.*} \
-	--build-arg=CENTOS_VERSION=$CENTOS_VERSION \
-	--build-arg=PYTHON_VERSION=$PYTHON_VERSION \
+	-f "${dn}/centos/Dockerfile" \
+	-t "antest:centos-${CENTOS_VERSION%%.*}" \
+	--build-arg="CENTOS_VERSION=$CENTOS_VERSION" \
+	--build-arg="PYTHON_VERSION=$PYTHON_VERSION" \
+	"$dn"
+}
+
+_build_amazonlinux() {
+    local fn=${FUNCNAME[0]}
+
+    # shellcheck disable=SC2153
+    echo_info "Build Amazon Linux $AMAZONLINUX_VERSION image with openssh-server"
+    buildah bud \
+	-f "${dn}/amazonlinux/Dockerfile" \
+	-t "antest:amzn-${AMAZONLINUX_VERSION%%.*}" \
+	--build-arg="AMAZONLINUX_VERSION=$AMAZONLINUX_VERSION" \
 	"$dn"
 }
 
