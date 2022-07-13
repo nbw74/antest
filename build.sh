@@ -4,8 +4,9 @@ set -o nounset
 set -o errtrace
 set -o pipefail
 
+readonly CENTOS_6_VERSION=6.10
 readonly CENTOS_7_VERSION=7.9.2009
-# readonly CENTOS_8_VERSION=8.4.2105
+readonly CENTOS_8_VERSION=8.4.2105
 readonly AMAZONLINUX_VERSION=2
 
 export BUILDAH_LAYERS=true
@@ -21,14 +22,44 @@ main() {
     trap 'except $LINENO' ERR
 
     if [[ ! -f "${dn}/id_ed25519" ]]; then
-	echo_info "Generate SSH key pair"
+	echo_info "Generate ed25519 SSH key pair"
 	ssh-keygen -t ed25519 -N '' -f ./id_ed25519
     fi
 
-    CENTOS_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
-#     CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=36 _build_centos
-    _build_amazonlinux
+    if [[ ! -f "${dn}/id_dsa" ]]; then
+	echo_info "Generate DSA SSH key pair"
+	ssh-keygen -m PEM -t dsa -N '' -f ./id_dsa
+    fi
 
+    case "${target:-nop}" in
+	c6)
+	    CENTOS_VERSION=$CENTOS_6_VERSION _build_centos_sysv
+	    ;;
+	c7)
+	    CENTOS_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
+	    ;;
+	c8)
+	    CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=36 _build_centos
+	    ;;
+	amzn)
+	    _build_amazonlinux
+	    ;;
+	*)
+	    usage
+    esac
+
+}
+
+_build_centos_sysv() {
+    local fn=${FUNCNAME[0]}
+
+    # shellcheck disable=SC2153
+    echo_info "Build CentOS $CENTOS_VERSION image with openssh-server"
+    buildah bud \
+	-f "${dn}/centos_sysv/Dockerfile" \
+	-t "antest:centos-${CENTOS_VERSION%%.*}" \
+	--build-arg="CENTOS_VERSION=$CENTOS_VERSION" \
+	"$dn"
 }
 
 _build_centos() {
@@ -65,6 +96,44 @@ except() {
 
     exit $ret
 }
+
+usage() {
+    echo -e "\\n    Usage: $bn [OPTION]\\n
+    Options:
+
+    -t, --target <str>	    build defined target
+
+				c6	CentOS 6
+				c7	CentOS 7
+				c8	CentOS 8
+				amzn	Amazon Linux 2
+
+    -h, --help			print help
+"
+}
+
+# Getopts
+getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
+
+if ! TEMP=$(getopt -o t:h --longoptions target:,help -n "$bn" -- "$@")
+then
+    echo "Terminating..." >&2
+    exit 1
+fi
+
+eval set -- "$TEMP"
+unset TEMP
+
+while true; do
+    case $1 in
+	-t|--target)
+	    target=$2 ;		shift 2	;;
+	--)
+	    shift ;		break	;;
+	*)
+	    usage ;		exit 1
+    esac
+done
 
 echo_err()      { tput bold; tput setaf 7; echo "* ERROR: $*" ;   tput sgr0;   }
 echo_fatal()    { tput bold; tput setaf 1; echo "* FATAL: $*" ;   tput sgr0;   }

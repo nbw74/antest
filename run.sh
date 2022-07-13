@@ -72,7 +72,7 @@ _create() {
 	_target="${ansible_target_container}-$c"
 
 	[[ -n "$PUBLISH_HTTP" && $c -gt 1 ]] && PUBLISH_HTTP=""
-
+	# shellcheck disable=SC2086
 	if ! inArray ContainersAll "$_target"; then
 	    local publish="127.0.0.$(( START_OCTET + c - 1 )):$(( POD_SSH_PORT + c - 1 )):${CONTAINER_SSH_PORT}"
 	    echo_info "Run container $_target with publish $publish"
@@ -103,7 +103,7 @@ _run() {
     local fn=${FUNCNAME[0]}
 
     export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
-    export ANSIBLE_HOST_KEY_CHECKING="false"
+    export ANSIBLE_HOST_KEY_CHECKING="False"
     export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
 
     if [[ -f requirements.yml ]]; then
@@ -111,8 +111,22 @@ _run() {
 	    && ansible-galaxy install -r requirements.yml --force
     fi
 
+    local ssh_key_type=""
+    # shellcheck disable=SC2034
+    local -a oldSSH=(
+	"antest:centos-5"
+	"antest:centos-6"
+    )
+
+    if inArray oldSSH "$USED_IMAGE"; then
+	ssh_key_type=dsa
+    else
+	ssh_key_type=ed25519
+    fi
+
     ansible-playbook $PLAYBOOK -b --diff -u ansible \
-	--private-key "${ANTEST_PROJECT_DIR}/id_ed25519" \
+	--private-key "${ANTEST_PROJECT_DIR}/id_$ssh_key_type" \
+	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
 	-i "$INVENTORY"
 }
 
@@ -211,9 +225,10 @@ usage() {
     -N, --no-create		don't create containers (just run ansible on existing container)
     -V, --used-image		available images:
 
-				    antools:centos-7
-				    antools:centos-8
-				    antools:amzn-2
+				    antest:centos-6
+				    antest:centos-7
+				    antest:centos-8
+				    antest:amzn-2
 
     -h, --help			print help
 "
