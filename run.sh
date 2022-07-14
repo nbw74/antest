@@ -227,7 +227,7 @@ usage() {
 
 				    antest:centos-6
 				    antest:centos-7
-				    antest:centos-8
+				    antest:almalinux-8
 				    antest:amzn-2
 
     -h, --help			print help

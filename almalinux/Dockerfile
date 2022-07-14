@@ -1,6 +1,6 @@
 # vim: set ft=dockerfile:
 ARG RH_VERSION
-FROM docker.io/centos:$RH_VERSION
+FROM docker.io/almalinux:$RH_VERSION
 
 WORKDIR /root
 
@@ -8,14 +8,14 @@ ARG PYTHON_VERSION
 
 # hadolint ignore=DL3033
 RUN set -eux; \
-    yum -y install \
+    dnf -y install \
 	bash-completion \
 	iproute \
 	openssh-server \
 	python$PYTHON_VERSION \
 	sudo \
 	; \
-    yum -y clean all
+    dnf -y clean all
 
 RUN set -eux; \
     ssh-keygen -A; \
@@ -32,4 +32,3 @@ RUN set -eux; \
     chmod 0600 /home/ansible/.ssh/authorized_keys
 
 CMD ["/sbin/init"]
-

@@ -6,7 +6,7 @@ set -o pipefail
 
 readonly CENTOS_6_VERSION=6.10
 readonly CENTOS_7_VERSION=7.9.2009
-readonly CENTOS_8_VERSION=8.4.2105
+readonly ALMALINUX_8_VERSION=8.6
 readonly AMAZONLINUX_VERSION=2
 
 export BUILDAH_LAYERS=true
@@ -33,13 +33,13 @@ main() {
 
     case "${target:-nop}" in
 	c6)
-	    CENTOS_VERSION=$CENTOS_6_VERSION _build_centos_sysv
+	    RH_VERSION=$CENTOS_6_VERSION _build_centos_sysv
 	    ;;
 	c7)
-	    CENTOS_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
+	    RH_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
 	    ;;
-	c8)
-	    CENTOS_VERSION=$CENTOS_8_VERSION PYTHON_VERSION=36 _build_centos
+	a8)
+	    RH_VERSION=$ALMALINUX_8_VERSION PYTHON_VERSION=38 _build_almalinux
 	    ;;
 	amzn)
 	    _build_amazonlinux
@@ -47,18 +47,17 @@ main() {
 	*)
 	    usage
     esac
-
 }
 
 _build_centos_sysv() {
     local fn=${FUNCNAME[0]}
 
     # shellcheck disable=SC2153
-    echo_info "Build CentOS $CENTOS_VERSION image with openssh-server"
+    echo_info "Build CentOS $RH_VERSION image with openssh-server"
     buildah bud \
 	-f "${dn}/centos_sysv/Dockerfile" \
-	-t "antest:centos-${CENTOS_VERSION%%.*}" \
-	--build-arg="CENTOS_VERSION=$CENTOS_VERSION" \
+	-t "antest:centos-${RH_VERSION%%.*}" \
+	--build-arg="RH_VERSION=$RH_VERSION" \
 	"$dn"
 }
 
@@ -66,11 +65,24 @@ _build_centos() {
     local fn=${FUNCNAME[0]}
 
     # shellcheck disable=SC2153
-    echo_info "Build CentOS $CENTOS_VERSION image with Python$PYTHON_VERSION and openssh-server"
+    echo_info "Build CentOS $RH_VERSION image with Python$PYTHON_VERSION and openssh-server"
     buildah bud \
 	-f "${dn}/centos/Dockerfile" \
-	-t "antest:centos-${CENTOS_VERSION%%.*}" \
-	--build-arg="CENTOS_VERSION=$CENTOS_VERSION" \
+	-t "antest:centos-${RH_VERSION%%.*}" \
+	--build-arg="RH_VERSION=$RH_VERSION" \
+	--build-arg="PYTHON_VERSION=$PYTHON_VERSION" \
+	"$dn"
+}
+
+_build_almalinux() {
+    local fn=${FUNCNAME[0]}
+
+    # shellcheck disable=SC2153
+    echo_info "Build CentOS $RH_VERSION image with Python$PYTHON_VERSION and openssh-server"
+    buildah bud \
+	-f "${dn}/almalinux/Dockerfile" \
+	-t "antest:almalinux-${RH_VERSION%%.*}" \
+	--build-arg="RH_VERSION=$RH_VERSION" \
 	--build-arg="PYTHON_VERSION=$PYTHON_VERSION" \
 	"$dn"
 }
@@ -105,7 +117,7 @@ usage() {
 
 				c6	CentOS 6
 				c7	CentOS 7
-				c8	CentOS 8
+				a8	AlmaLinux 8
 				amzn	Amazon Linux 2
 
     -h, --help			print help
