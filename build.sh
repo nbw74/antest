@@ -39,7 +39,7 @@ main() {
 	    RH_VERSION=$CENTOS_7_VERSION PYTHON_VERSION=2 _build_centos
 	    ;;
 	a8)
-	    RH_VERSION=$ALMALINUX_8_VERSION PYTHON_VERSION=38 _build_almalinux
+	    RH_VERSION=$ALMALINUX_8_VERSION PYTHON_VERSION=36 _build_almalinux
 	    ;;
 	amzn)
 	    _build_amazonlinux

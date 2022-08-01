@@ -10,6 +10,7 @@ ARG PYTHON_VERSION
 RUN set -eux; \
     yum -y install \
 	bash-completion \
+	bzip2 \
 	iproute \
 	openssh-server \
 	python$PYTHON_VERSION \

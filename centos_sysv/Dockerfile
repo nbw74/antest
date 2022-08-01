@@ -13,6 +13,7 @@ RUN set -eux; \
 	-e "s!^gpgkey.*\$!gpgkey=http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-${RH_VERSION%%.*}!g" \
 	/etc/yum.repos.d/CentOS-Base.repo; \
     yum -y install \
+	bzip2 \
 	iproute \
 	openssh-server \
 	rsyslog \

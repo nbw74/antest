@@ -10,6 +10,7 @@ ARG PYTHON_VERSION
 RUN set -eux; \
     dnf -y install \
 	bash-completion \
+	bzip2 \
 	iproute \
 	openssh-server \
 	python$PYTHON_VERSION \

@@ -262,7 +262,7 @@ while true; do
 	-H|--publish-http)
 	    PUBLISH_HTTP='--publish "0.0.0.0:80:80" --publish "0.0.0.0:443:443"' ;	shift	;;
 	-K|--no-keep-running)
-	    KEEP_RUNNING=1 ;	shift	;;
+	    KEEP_RUNNING=0 ;	shift	;;
 	-N|--no-create)
 	    NO_CREATE=1 ;	shift	;;
 	-s|--stop)

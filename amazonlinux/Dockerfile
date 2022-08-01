@@ -8,6 +8,7 @@ WORKDIR /root
 RUN set -eux; \
     yum -y install \
 	bash-completion \
+	bzip2 \
 	iproute \
 	openssh-server \
 	sudo \
