@@ -11,6 +11,7 @@ RUN set -eux; \
     dnf -y install \
 	bash-completion \
 	bzip2 \
+	glibc-langpack-en \
 	iproute \
 	openssh-server \
 	python$PYTHON_VERSION \

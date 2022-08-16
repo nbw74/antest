@@ -124,10 +124,16 @@ _run() {
 	ssh_key_type=ed25519
     fi
 
+    local extra_vars=""
+
+    if [[ -f vars.local ]]; then
+	extra_vars="-e @vars.local"
+    fi
+    # shellcheck disable=SC2086
     ansible-playbook $PLAYBOOK -b --diff -u ansible \
 	--private-key "${ANTEST_PROJECT_DIR}/id_$ssh_key_type" \
 	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
-	-i "$INVENTORY"
+	-i "$INVENTORY" $extra_vars
 }
 
 _stop() {
