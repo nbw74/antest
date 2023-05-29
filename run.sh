@@ -130,7 +130,7 @@ _run() {
 	extra_vars="-e @vars.local"
     fi
     # shellcheck disable=SC2086
-    ansible-playbook $PLAYBOOK -b --diff -u ansible \
+    ansible-playbook $PLAYBOOK -b -u ansible \
 	--private-key "${ANTEST_PROJECT_DIR}/id_$ssh_key_type" \
 	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
 	-i "$INVENTORY" $extra_vars
@@ -234,6 +234,7 @@ usage() {
 				    antest:centos-6
 				    antest:centos-7
 				    antest:almalinux-8
+				    antest:almalinux-9
 				    antest:amzn-2
 
     -h, --help			print help

@@ -7,6 +7,7 @@ set -o pipefail
 readonly CENTOS_6_VERSION=6.10
 readonly CENTOS_7_VERSION=7.9.2009
 readonly ALMALINUX_8_VERSION=8.6
+readonly ALMALINUX_9_VERSION=9
 readonly AMAZONLINUX_VERSION=2
 
 export BUILDAH_LAYERS=true
@@ -41,8 +42,14 @@ main() {
 	a8)
 	    RH_VERSION=$ALMALINUX_8_VERSION PYTHON_VERSION=36 _build_almalinux
 	    ;;
+	a9)
+	    RH_VERSION=$ALMALINUX_9_VERSION PYTHON_VERSION=39 _build_almalinux
+	    ;;
 	amzn)
 	    _build_amazonlinux
+	    ;;
+	focal)
+	    UBUNTU_VERSION=focal PYTHON_VERSION=3.8 _build_ubuntu
 	    ;;
 	*)
 	    usage
@@ -99,6 +106,19 @@ _build_amazonlinux() {
 	"$dn"
 }
 
+_build_ubuntu() {
+    local fn=${FUNCNAME[0]}
+
+    # shellcheck disable=SC2153
+    echo_info "Build Ubuntu $UBUNTU_VERSION image with openssh-server"
+    buildah bud \
+	-f "${dn}/ubuntu/Dockerfile" \
+	-t "antest:ubuntu-${UBUNTU_VERSION%%.*}" \
+	--build-arg="UBUNTU_VERSION=$UBUNTU_VERSION" \
+	--build-arg="PYTHON_VERSION=$PYTHON_VERSION" \
+	"$dn"
+}
+
 except() {
     local ret=$?
     local no=${1:-no_line}
@@ -118,7 +138,9 @@ usage() {
 				c6	CentOS 6
 				c7	CentOS 7
 				a8	AlmaLinux 8
+				a9	AlmaLinux 9
 				amzn	Amazon Linux 2
+				focal	Ubuntu focal
 
     -h, --help			print help
 "
