@@ -124,6 +124,14 @@ _run() {
 	ssh_key_type=ed25519
     fi
 
+    if [[ "${ANSIBLE_INVENTORY:-nul}" != "nul" ]]; then
+	ANSIBLE_INVENTORY="${ANSIBLE_INVENTORY},$INVENTORY"
+    else
+	ANSIBLE_INVENTORY="$INVENTORY"
+    fi
+
+    export ANSIBLE_INVENTORY
+
     local extra_vars=""
 
     if [[ -f vars.local ]]; then
@@ -133,7 +141,7 @@ _run() {
     ansible-playbook $PLAYBOOK -b -u ansible \
 	--private-key "${ANTEST_PROJECT_DIR}/id_$ssh_key_type" \
 	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
-	-i "$INVENTORY" $extra_vars
+	$extra_vars
 }
 
 _stop() {
