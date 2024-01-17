@@ -16,6 +16,9 @@ argument_specs:
           - o.7
           - o.8
           - o.9
+          - r.7
+          - r.8
+          - r.9
           - w.2
           - w.2023
           - y.8

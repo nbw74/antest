@@ -1,0 +1,12 @@
+= Usage
+
+Run this playbooks with command
+
+.shell
+----
+source ~/venv-ansible-212/bin/activate && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build %
+----
+.gvim
+----
+term bash -c "source ~/venv-ansible-212/bin/activate && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build %"
+----

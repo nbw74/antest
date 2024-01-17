@@ -1,0 +1,6 @@
+---
+build__packages_common:
+  - iproute
+  - openssh-server
+  - sudo
+...

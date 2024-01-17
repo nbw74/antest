@@ -1,5 +1,3 @@
 ---
-build__packages: []
-
 build_skip_ssh_service: true
 ...

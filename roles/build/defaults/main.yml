@@ -1,5 +1,6 @@
 ---
 build_force_dnf: false
+build__packages: []
 build_skip_ssh_host_keys: false
 build_skip_ssh_service: false
 ...

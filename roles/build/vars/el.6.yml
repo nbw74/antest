@@ -1,5 +1,8 @@
 ---
-build__packages_common: []
+build__packages_common:
+  - iproute
+  - openssh-server
+  - sudo
 
 build__packages:
   - rsyslog

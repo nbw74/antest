@@ -111,6 +111,7 @@ _run() {
     local fn=${FUNCNAME[0]}
 
     export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
+    export ANSIBLE_COLLECTIONS_PATH="${HOME}/projects/sb:${HOME}/.ansible/collections"
     export ANSIBLE_HOST_KEY_CHECKING="False"
     export ANSIBLE_STDOUT_CALLBACK=yaml
     export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"

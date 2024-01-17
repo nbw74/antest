@@ -1,6 +1,4 @@
 ---
-build__packages: []
-
 build_force_dnf: true
 build_skip_ssh_service: true
 ...
