@@ -1,0 +1,6 @@
+---
+build__packages:
+  - python39
+
+build_skip_ssh_service: true
+...

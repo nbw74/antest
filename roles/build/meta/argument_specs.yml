@@ -1,0 +1,32 @@
+---
+argument_specs:
+  main:
+    short_description: The main entry point for the build role.
+    options:
+      build_flavour:
+        required: true
+        type: str
+        choices:
+          - a.8
+          - a.9
+          - c.6
+          - c.7
+          - c.8
+          - c.9
+          - o.7
+          - o.8
+          - o.9
+          - w.2
+          - w.2023
+          - y.8
+          - y.9
+      build_force_dnf:
+        type: bool
+        default: false
+      build_skip_ssh_host_keys:
+        type: bool
+        default: false
+      build_skip_ssh_service:
+        type: bool
+        default: false
+...

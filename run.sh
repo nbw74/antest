@@ -5,7 +5,7 @@ set -o errtrace
 set -o pipefail
 
 readonly PODMAN_SUBNET=10.25.11.0/24
-readonly ANTEST_PROJECT_DIR="${HOME}/projects/nbw74/antest"
+readonly ANTEST_PROJECT_DIR="${HOME}/projects/github/nbw74/antest"
 readonly BIN_REQUIRED="podman"
 
 typeset bn=""
@@ -13,7 +13,7 @@ bn="$(basename "$0")"
 readonly bn
 
 typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0
-typeset PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
+typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 readonly CONTAINER_SSH_PORT=$POD_SSH_PORT
 
@@ -26,6 +26,10 @@ main() {
     local ansible_rolename_norm=${ansible_rolename//_/-}
     local ansible_network_name="ansible-test-podman"
     local ansible_target_container="${NAME_PREFIX:-$ansible_rolename_norm}"
+
+    if [[ -f "${HOME}/.config/run.sh.conf" ]]; then
+	source "${HOME}/.config/run.sh.conf"
+    fi
 
     if [[ $ACT_STOP == 0 && $ACT_REMOVE == 0 ]]; then
 
@@ -71,6 +75,7 @@ _create() {
     for (( c = 1; c <= INSTANCES; c++ )); do
 	_target="${ansible_target_container}-$c"
 
+	[[ -n "$PUBLISH_FTP" && $c -gt 1 ]] && PUBLISH_FTP=""
 	[[ -n "$PUBLISH_HTTP" && $c -gt 1 ]] && PUBLISH_HTTP=""
 	# shellcheck disable=SC2086
 	if ! inArray ContainersAll "$_target"; then
@@ -80,9 +85,11 @@ _create() {
 		--privileged \
 		--name="$_target" \
 		--network="$ansible_network_name" \
+		$PUBLISH_FTP \
 		$PUBLISH_HTTP \
 		--publish "$publish" \
 		"localhost/$USED_IMAGE"
+	    sleep 2
 	fi
     done
 
@@ -95,6 +102,7 @@ _create() {
 	if ! inArray ContainersRunning "$_target"; then
 	    echo_info "Start container $_target"
 	    podman start "$_target"
+	    sleep 2
 	fi
     done
 }
@@ -104,6 +112,7 @@ _run() {
 
     export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
     export ANSIBLE_HOST_KEY_CHECKING="False"
+    export ANSIBLE_STDOUT_CALLBACK=yaml
     export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
 
     if [[ -f requirements.yml ]]; then
@@ -244,6 +253,7 @@ usage() {
 				    antest:almalinux-8
 				    antest:almalinux-9
 				    antest:amzn-2
+				    antest:amzn-2023
 
     -h, --help			print help
 "
@@ -251,7 +261,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:c:i:I:p:n:HKNsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-http,no-keep-running,no-create,stop,remove,used-image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:c:i:I:p:n:FHKNsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,stop,remove,used-image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -274,6 +284,8 @@ while true; do
 	    PLAYBOOK=$2 ;	shift 2	;;
 	-n|--prefix)
 	    NAME_PREFIX=$2 ;	shift 2	;;
+	-F|--publish-ftp)
+	    PUBLISH_FTP='--publish "0.0.0.0:20:20" --publish "0.0.0.0:21:21" --publish "0.0.0.0:49900-50000:49900-50000"' ;	shift	;;
 	-H|--publish-http)
 	    PUBLISH_HTTP='--publish "0.0.0.0:80:80" --publish "0.0.0.0:443:443"' ;	shift	;;
 	-K|--no-keep-running)
@@ -295,11 +307,11 @@ while true; do
     esac
 done
 
-echo_err()      { tput bold; tput setaf 7; echo "* ERROR: $*" ;   tput sgr0;   }
-echo_fatal()    { tput bold; tput setaf 1; echo "* FATAL: $*" ;   tput sgr0;   }
-echo_warn()     { tput bold; tput setaf 3; echo "* WARNING: $*" ; tput sgr0;   }
-echo_info()     { tput bold; tput setaf 6; echo "* INFO: $*" ;    tput sgr0;   }
-echo_ok()       { tput bold; tput setaf 2; echo "* OK" ;          tput sgr0;   }
+echo_err()      { echo "* ERROR: $*" ;   }
+echo_fatal()    { echo "* FATAL: $*" ;   }
+echo_warn()     { echo "* WARNING: $*" ; }
+echo_info()     { echo "* INFO: $*" ;    }
+echo_ok()       { echo "* OK" ;          }
 
 main
 

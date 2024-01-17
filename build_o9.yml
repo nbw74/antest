@@ -1,0 +1,23 @@
+# vim: set ft=yaml.ansible:
+---
+- name: Build antest images
+  hosts: localhost
+  diff: true
+
+  vars:
+    ansible_bender:
+      base_image: oraclelinux:9
+
+      cache_tasks: false
+      layering: false
+
+      target_image:
+        cmd: /sbin/init
+        name: antest:oel-9
+        working_dir: /root
+
+    build_flavour: o.9
+
+  roles:
+    - build
+...

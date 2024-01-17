@@ -1,0 +1,13 @@
+---
+- name: Comment in pam_loginuid line in sshd PAM config
+  lineinfile:
+    path: /etc/pam.d/sshd
+    regexp: '^(.*pam_loginuid\.so.*)$'
+    line: '# \1'
+    backrefs: true
+
+- name: Rsyslog service enabled
+  service:
+    name: rsyslog
+    enabled: true
+...

@@ -1,0 +1,4 @@
+---
+build__packages:
+  - python2
+...

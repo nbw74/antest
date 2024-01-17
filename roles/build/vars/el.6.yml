@@ -1,0 +1,10 @@
+---
+build__packages_common: []
+
+build__packages:
+  - rsyslog
+
+build__ssh_key: "{{ lookup('file', 'id_dsa.pub') }}"
+
+build_skip_ssh_host_keys: true
+...

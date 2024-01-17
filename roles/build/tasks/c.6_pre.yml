@@ -1,0 +1,19 @@
+---
+- name: Delete mirrorlist line
+  lineinfile:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    regexp: '^mirrorlist'
+    state: absent
+
+- name: Set vault last mirror
+  replace:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    regexp: '.*(baseurl=.+)mirror\.centos\.org/centos/.releasever'
+    replace: "\\1vault.centos.org/{{ ansible_bender.base_image|split(':')|last }}"
+
+- name: Set gpg key
+  replace:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    regexp: '^gpgkey.*'
+    replace: "gpgkey=http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-{{ ansible_bender.base_image|split(':')|last|split('.')|first }}"
+...

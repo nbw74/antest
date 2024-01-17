@@ -1,0 +1,8 @@
+---
+- name: Symlink to python created
+  community.general.alternatives:
+    name: python
+    path: /usr/bin/python3.9
+    link: /usr/bin/python
+    state: present
+...

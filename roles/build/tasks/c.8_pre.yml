@@ -1,0 +1,36 @@
+---
+- name: Delete mirrorlist line
+  lineinfile:
+    path: "/etc/yum.repos.d/CentOS-Linux-{{ _b_repo }}.repo"
+    regexp: '^mirrorlist'
+    state: absent
+  loop:
+    - AppStream
+    - BaseOS
+  loop_control:
+    loop_var: _b_repo
+
+- name: Set vault last mirror
+  replace:
+    path: "/etc/yum.repos.d/CentOS-Linux-{{ _b_repo }}.repo"
+    regexp: '.*(baseurl=.+)mirror\.centos\.org/.contentdir/.releasever'
+    replace: "\\1vault.centos.org/{{ ansible_bender.base_image|split(':')|last }}"
+  loop:
+    - AppStream
+    - BaseOS
+    - Extras
+  loop_control:
+    loop_var: _b_repo
+
+- name: Gpgcheck disable
+  lineinfile:
+    path: "/etc/yum.repos.d/CentOS-Linux-{{ _b_repo }}.repo"
+    regexp: 'gpgcheck=.*'
+    line: "gpgcheck=0"
+  loop:
+    - AppStream
+    - BaseOS
+    - Extras
+  loop_control:
+    loop_var: _b_repo
+...
