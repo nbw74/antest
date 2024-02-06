@@ -46,6 +46,14 @@
     - paths:
         - "{{ role_path }}/tasks"
 
+- name: Create locale
+  command:
+    argv:
+      - localedef
+      - --inputfile=en_US
+      - --charmap=UTF-8
+      - en_US.UTF-8
+
 - name: Create ssh host keys
   when: not build_skip_ssh_host_keys
   command:

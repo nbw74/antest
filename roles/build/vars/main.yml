@@ -2,6 +2,7 @@
 build__packages_common:
   - bash-completion
   - iproute
+  - ncurses
   - openssh-server
   - sudo
 
