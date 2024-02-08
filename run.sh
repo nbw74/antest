@@ -12,10 +12,8 @@ typeset bn=""
 bn="$(basename "$0")"
 readonly bn
 
-typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0
+typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 CONTAINER_SSH_PORT=2222 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0
 typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
-
-readonly CONTAINER_SSH_PORT=$POD_SSH_PORT
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -68,7 +66,7 @@ _create() {
     mapfile -t Networks < <(podman network ls --format="{{.Name}}")
 
     if ! inArray Networks "$ansible_network_name"; then
-	echo_info "Creating network '$ansible_network_name'"
+	Lecho_info "Creating network '$ansible_network_name'"
 	podman network create --subnet "$PODMAN_SUBNET" "$ansible_network_name"
     fi
 
@@ -247,22 +245,14 @@ usage() {
     -R, --remove		remove containers
     -K, --no-keep-running	stop containers after double plays
     -N, --no-create		don't create containers (just run ansible on existing container)
-    -V, --used-image		available images:
-
-				    antest:centos-6
-				    antest:centos-7
-				    antest:almalinux-8
-				    antest:almalinux-9
-				    antest:amzn-2
-				    antest:amzn-2023
-
+    -V, --used-image		see 'podman images' for available images
     -h, --help			print help
 "
 }
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:c:i:I:p:n:FHKNsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,stop,remove,used-image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:A:c:i:I:p:n:FHKNsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,stop,remove,used-image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -275,6 +265,8 @@ while true; do
     case $1 in
 	-a|--ssh-port)
 	    POD_SSH_PORT=$2 ;	shift 2	;;
+	-A)
+	    CONTAINER_SSH_PORT=$2 ;	shift 2	;;
 	-c|--instances)
 	    INSTANCES=$2 ;	shift 2	;;
 	-i|--inventory)

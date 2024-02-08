@@ -65,7 +65,7 @@
   lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^.*Port 22.*$'
-    line: 'Port 2222'
+    line: 'Port {{ build_ssh_port }}'
 
 - name: SSH service enabled
   when: not build_skip_ssh_service

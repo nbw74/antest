@@ -32,4 +32,7 @@ argument_specs:
       build_skip_ssh_service:
         type: bool
         default: false
+      build_ssh_port:
+        type: int
+        default: 2222
 ...
