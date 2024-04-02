@@ -1,0 +1,25 @@
+# vim: set ft=yaml.ansible:
+---
+- name: Template ansible-bender playbook
+  hosts: localhost
+  diff: true
+
+  vars:
+    _b: "{{ build_flavours[flavour] }}"
+
+  tasks:
+    - name: Assert that all needed vars is defined
+      assert:
+        that:
+          - flavour is defined
+          - _b.os_family is defined
+          - _b.distribution is defined
+          - _b.major_version is defined
+          - _b.minor_version is defined
+
+    - name: Render playbook template
+      template:
+        src: build.yml.j2
+        dest: build.yml
+        mode: "0644"
+...

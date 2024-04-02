@@ -1,12 +1,7 @@
 = Usage
 
-Run this playbooks with command
-
-.shell
+.*.vimrc*
 ----
-source ~/venv-ansible-212/bin/activate && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build %
+command -nargs=1 BenderBuild term bash -c "source ${HOME}/venv/ansible/bin/activate && ansible-playbook -i inventory/hosts.yml -e flavour=<args> prepare.yml && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build build.yml"
 ----
-.gvim
-----
-term bash -c "source ~/venv-ansible-212/bin/activate && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build %"
-----
+where ARGS is element of the `build_flavours` dictionary (e.q. "almalinux_8"), see *inventory/host_vars/localhost.yml*.

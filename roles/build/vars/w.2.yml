@@ -1,3 +1,6 @@
 ---
+build__packages:
+  - glibc-locale-source
+
 build_skip_ssh_service: true
 ...

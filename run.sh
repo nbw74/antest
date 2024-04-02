@@ -13,7 +13,8 @@ bn="$(basename "$0")"
 readonly bn
 
 typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 CONTAINER_SSH_PORT=2222 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0
-typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
+typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" NETWORK_PROXY=""
+typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -66,7 +67,8 @@ _create() {
     mapfile -t Networks < <(podman network ls --format="{{.Name}}")
 
     if ! inArray Networks "$ansible_network_name"; then
-	Lecho_info "Creating network '$ansible_network_name'"
+	echo_info "Creating network '$ansible_network_name'"
+	# podman unshare --rootless-netns
 	podman network create --subnet "$PODMAN_SUBNET" "$ansible_network_name"
     fi
 
@@ -113,6 +115,15 @@ _run() {
     export ANSIBLE_HOST_KEY_CHECKING="False"
     export ANSIBLE_STDOUT_CALLBACK=yaml
     export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
+
+    if [[ -n $NETWORK_PROXY ]]; then
+	HTTP_PROXY="$NETWORK_PROXY"
+	HTTPS_PROXY="$NETWORK_PROXY"
+	http_proxy="$NETWORK_PROXY"
+	https_proxy="$NETWORK_PROXY"
+
+	export HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+    fi
 
     if [[ -f requirements.yml ]]; then
 	ansible-galaxy install -r requirements.yml 2>&1 | grep -F -- 'use --force' \
@@ -245,6 +256,7 @@ usage() {
     -R, --remove		remove containers
     -K, --no-keep-running	stop containers after double plays
     -N, --no-create		don't create containers (just run ansible on existing container)
+    -P, --network-proxy		set HTTP_PROXY and HTTPS_PROXY environment variables
     -V, --used-image		see 'podman images' for available images
     -h, --help			print help
 "
@@ -252,7 +264,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:A:c:i:I:p:n:FHKNsRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,stop,remove,used-image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:A:c:i:I:p:n:FHKNP:sRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,stop,remove,used-image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -285,6 +297,8 @@ while true; do
 	    KEEP_RUNNING=0 ;	shift	;;
 	-N|--no-create)
 	    NO_CREATE=1 ;	shift	;;
+	-P|--network-proxy)
+	    NETWORK_PROXY=$2 ;	shift 2	;;
 	-s|--stop)
 	    ACT_STOP=1 ;	shift	;;
 	-R|--remove)

@@ -1,0 +1,32 @@
+---
+- name: "Build {{ _b.distribution }}-{{ _b.major_version }} antest image"
+  hosts: localhost
+  diff: true
+
+  vars:
+    ansible_bender:
+      base_image: "{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+
+      cache_tasks: false
+      layering: false
+
+      target_image:
+        cmd: /sbin/init
+{% if _b.ssh_port is defined %}
+        name: "antest:{{ _b.distribution }}-{{ _b.major_version }}-{{ _b.ssh_port|string }}"
+{% else %}
+        name: "antest:{{ _b.distribution }}-{{ _b.major_version }}"
+{% endif %}
+        working_dir: /root
+
+    build_distribution: "{{ _b.distribution }}"
+    build_major_version: "{{ _b.major_version }}"
+    build_minor_version: "{{ _b.minor_version }}"
+    build_os_family: "{{ _b.os_family }}"
+{% if _b.ssh_port is defined %}
+    build_ssh_port: "{{ _b.ssh_port }}"
+{% endif %}
+
+  roles:
+    - build
+...

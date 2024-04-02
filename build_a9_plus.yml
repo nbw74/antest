@@ -6,17 +6,18 @@
 
   vars:
     ansible_bender:
-      base_image: almalinux:8.9
+      base_image: almalinux:9.3
 
       cache_tasks: false
       layering: false
 
       target_image:
         cmd: /sbin/init
-        name: antest:alma-8
+        name: antest:alma-9-plus
         working_dir: /root
 
-    build_flavour: a.8
+    build_flavour: a.9
+    build_ssh_port: 2223
 
   roles:
     - build

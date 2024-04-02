@@ -4,8 +4,8 @@
     file: "{{ item }}"
   with_first_found:
     - files:
-        - "{{ build_flavour }}.yml"
-        - "el.{{ build_flavour.split('.')|last }}.yml"
+        - "{{ build_distribution }}-{{ build_major_version }}.yml"
+        - "{{ build_os_family }}-{{ build_major_version }}.yml"
     - paths:
         - "{{ role_path }}/vars"
 
@@ -14,7 +14,7 @@
     file: "{{ item }}"
   with_first_found:
     - files:
-        - "{{ build_flavour }}_pre.yml"
+        - "{{ build_distribution }}-{{ build_major_version }}_pre.yml"
         - empty.yml
     - paths:
         - "{{ role_path }}/tasks"
@@ -41,7 +41,7 @@
     file: "{{ item }}"
   with_first_found:
     - files:
-        - "{{ build_flavour }}_post.yml"
+        - "{{ build_distribution }}-{{ build_major_version }}_post.yml"
         - empty.yml
     - paths:
         - "{{ role_path }}/tasks"
@@ -83,6 +83,7 @@
     name: ansible
     user: ansible
     commands: ALL
+    runas: ALL
 
 - name: Authorized key copied
   ansible.posix.authorized_key:

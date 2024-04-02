@@ -1,0 +1,14 @@
+---
+build_flavours:
+  almalinux_8:
+    os_family: redhat
+    distribution: almalinux
+    major_version: 8
+    minor_version: 9
+  almalinux_8_plus:
+    os_family: redhat
+    distribution: almalinux
+    major_version: 8
+    minor_version: 9
+    ssh_port: 2223
+...
