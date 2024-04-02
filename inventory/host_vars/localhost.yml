@@ -27,6 +27,18 @@ build_flavours:
     minor_version: "3"
     ssh_port: 2223
 
+  amazonlinux_2:
+    os_family: redhat
+    distribution: amazonlinux
+    major_version: "2"
+    minor_version: !!null
+
+  amazonlinux_2023:
+    os_family: redhat
+    distribution: amazonlinux
+    major_version: "2023"
+    minor_version: !!null
+
   centos_6:
     os_family: redhat
     distribution: centos
