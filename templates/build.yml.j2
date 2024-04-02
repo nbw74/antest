@@ -7,8 +7,10 @@
     ansible_bender:
 {% if _b.local_source|d(false) %}
       base_image: "localhost/{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
-{% else %}
+{% elif _b.minor_version is truthy %}
       base_image: "{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+{% else %}
+      base_image: "{{ _b.distribution }}:{{ _b.major_version }}"
 {% endif %}
 
       cache_tasks: false
@@ -22,6 +24,12 @@
 {% endif %}
 {% if _b.ssh_port is defined %}
         name: "antest:{{ _b.distribution }}-{{ _b.major_version }}-{{ _b.ssh_port|string }}"
+{% elif _b.distribution|split('/')|length > 1 %}
+{% if _b.major_version|int is truthy %}
+        name: "antest:{{ _b.distribution|split('/')|last }}-{{ _b.major_version }}"
+{% else %}
+        name: "antest:{{ _b.distribution|split('/')|last }}"
+{% endif %}
 {% else %}
         name: "antest:{{ _b.distribution }}-{{ _b.major_version }}"
 {% endif %}

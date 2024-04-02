@@ -8,8 +8,9 @@
     file: "{{ item }}"
   with_first_found:
     - files:
-        - "{{ build_distribution }}-{{ build_major_version }}.yml"
+        - "{{ build_distribution|split('/')|last }}-{{ build_major_version }}.yml"
         - "{{ build_os_family }}-{{ build_major_version }}.yml"
+        - "{{ build_distribution|split('/')|last }}.yml"
       paths:
         - "{{ role_path }}/vars"
 

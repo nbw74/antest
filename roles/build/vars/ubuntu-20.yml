@@ -1,6 +1,4 @@
 ---
 build__packages:
-  - iproute2
   - python3.8
-  - systemd
 ...

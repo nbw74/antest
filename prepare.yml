@@ -2,6 +2,7 @@
 ---
 - name: Template ansible-bender playbook
   hosts: localhost
+  gather_subset: [ 'min' ]
   diff: true
 
   vars:
@@ -25,6 +26,7 @@
 
 - name: Pre-build fucking damned OS image
   hosts: localhost
+  gather_subset: [ 'min' ]
   diff: true
 
   vars:

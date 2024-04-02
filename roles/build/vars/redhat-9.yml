@@ -1,0 +1,5 @@
+---
+build__packages:
+  - glibc-locale-source
+  - python39
+...

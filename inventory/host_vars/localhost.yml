@@ -14,6 +14,68 @@ build_flavours:
     minor_version: "9"
     ssh_port: 2223
 
+  almalinux_9:
+    os_family: redhat
+    distribution: almalinux
+    major_version: "9"
+    minor_version: "3"
+
+  almalinux_9_plus:
+    os_family: redhat
+    distribution: almalinux
+    major_version: "9"
+    minor_version: "3"
+    ssh_port: 2223
+
+  centos_6:
+    os_family: redhat
+    distribution: centos
+    major_version: "6"
+    minor_version: "10"
+
+  centos_7:
+    os_family: redhat
+    distribution: centos
+    major_version: "7"
+    minor_version: "9.2009"
+
+  centos_7_plus:
+    os_family: redhat
+    distribution: centos
+    major_version: "7"
+    minor_version: "9.2009"
+    ssh_port: 2223
+
+  centos_8:
+    os_family: redhat
+    distribution: centos
+    major_version: "8"
+    minor_version: "4.2105"
+
+  centos_9:
+    os_family: redhat
+    distribution: docker.io/dokken/centos-stream-9
+    major_version: "main"
+    minor_version: !!null
+
+  ubi_7:
+    os_family: redhat
+    distribution: registry.access.redhat.com/ubi7/ubi
+    major_version: "7"
+    minor_version: "9"
+
+  ubi_8:
+    os_family: redhat
+    distribution: registry.access.redhat.com/ubi8/ubi
+    major_version: "8"
+    minor_version: "9"
+
+  ubi_9:
+    os_family: redhat
+    distribution: registry.access.redhat.com/ubi9/ubi
+    major_version: "9"
+    minor_version: "3"
+
   ubuntu_focal:
     os_family: debian
     distribution: ubuntu
