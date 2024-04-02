@@ -1,11 +1,3 @@
 ---
-build__packages_common:
-  - bash-completion
-  - iproute
-  - less
-  - ncurses
-  - openssh-server
-  - sudo
-
 build__ssh_key: "{{ lookup('file', 'id_ed25519.pub') }}"
 ...

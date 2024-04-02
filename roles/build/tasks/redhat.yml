@@ -1,0 +1,26 @@
+---
+- name: Install required packages
+  when: not build_force_dnf
+  package:
+    name: "{{ build__packages_common|union(build__packages) }}"
+
+- name: Install required packages with forced dnf
+  when: build_force_dnf
+  dnf:
+    name: "{{ build__packages_common|union(build__packages) }}"
+
+- name: Cleanup package manager cache
+  command:
+    argv:
+      - "{{ ansible_pkg_mgr }}"
+      - clean
+      - all
+
+- name: Generate locale (redhat)
+  command:
+    argv:
+      - localedef
+      - --inputfile=en_US
+      - --charmap=UTF-8
+      - en_US.UTF-8
+...

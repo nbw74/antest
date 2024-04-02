@@ -2,6 +2,10 @@
 
 .*.vimrc*
 ----
-command -nargs=1 BenderBuild term bash -c "source ${HOME}/venv/ansible/bin/activate && ansible-playbook -i inventory/hosts.yml -e flavour=<args> prepare.yml && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build build.yml"
+command -nargs=1 BenderBuild term bash \
+  -c "source ${HOME}/venv/ansible/bin/activate \
+  && cd ~/projects/github/nbw74/antest \
+  && ansible-playbook -i inventory/hosts.yml -e flavour=<args> prepare.yml \
+  && ANSIBLE_FORCE_COLOR=true ANSIBLE_STDOUT_CALLBACK=yaml ansible-bender build build.yml"
 ----
 where ARGS is element of the `build_flavours` dictionary (e.q. "almalinux_8"), see *inventory/host_vars/localhost.yml*.

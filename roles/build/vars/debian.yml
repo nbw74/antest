@@ -1,0 +1,13 @@
+---
+build__packages_common:
+  - bash-completion
+  - iproute2
+  - less
+  - locales
+  - ncurses-base
+  - openssh-server
+  - sudo
+
+build__ssh_service_name: ssh
+build__wheel_group_name: sudo
+...

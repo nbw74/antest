@@ -1,0 +1,12 @@
+---
+- name: Install required packages with apt
+  apt:
+    name: "{{ build__packages_common|union(build__packages) }}"
+    install_recommends: false
+    update_cache: true
+    clean: true
+
+- name: Generate locale (debian)
+  community.general.locale_gen:
+    name: en_US.UTF-8
+...

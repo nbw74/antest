@@ -5,13 +5,21 @@
 
   vars:
     ansible_bender:
+{% if _b.local_source|d(false) %}
+      base_image: "localhost/{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+{% else %}
       base_image: "{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+{% endif %}
 
       cache_tasks: false
       layering: false
 
       target_image:
+{% if _b.cmd is defined %}
+        cmd: {{ _b.cmd }}
+{% else %}
         cmd: /sbin/init
+{% endif %}
 {% if _b.ssh_port is defined %}
         name: "antest:{{ _b.distribution }}-{{ _b.major_version }}-{{ _b.ssh_port|string }}"
 {% else %}

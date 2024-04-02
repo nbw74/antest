@@ -1,14 +1,32 @@
 ---
 build_flavours:
+
   almalinux_8:
     os_family: redhat
     distribution: almalinux
-    major_version: 8
-    minor_version: 9
+    major_version: "8"
+    minor_version: "9"
+
   almalinux_8_plus:
     os_family: redhat
     distribution: almalinux
-    major_version: 8
-    minor_version: 9
+    major_version: "8"
+    minor_version: "9"
     ssh_port: 2223
+
+  ubuntu_focal:
+    os_family: debian
+    distribution: ubuntu
+    major_version: "20"
+    minor_version: "04"
+    cmd: /lib/systemd/systemd
+    local_source: true
+
+  ubuntu_jammy:
+    os_family: debian
+    distribution: ubuntu
+    major_version: "22"
+    minor_version: "04"
+    cmd: /lib/systemd/systemd
+    local_source: true
 ...

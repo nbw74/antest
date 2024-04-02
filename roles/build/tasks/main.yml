@@ -1,4 +1,8 @@
 ---
+- name: OS_family vars included
+  include_vars:
+    file: "{{ build_os_family }}.yml"
+
 - name: Flavour vars loaded
   include_vars:
     file: "{{ item }}"
@@ -6,7 +10,7 @@
     - files:
         - "{{ build_distribution }}-{{ build_major_version }}.yml"
         - "{{ build_os_family }}-{{ build_major_version }}.yml"
-    - paths:
+      paths:
         - "{{ role_path }}/vars"
 
 - name: Flavour pre-install tasks included
@@ -15,26 +19,13 @@
   with_first_found:
     - files:
         - "{{ build_distribution }}-{{ build_major_version }}_pre.yml"
-        - empty.yml
-    - paths:
+      skip: true
+      paths:
         - "{{ role_path }}/tasks"
 
-- name: Install required packages
-  when: not build_force_dnf
-  package:
-    name: "{{ build__packages_common|union(build__packages) }}"
-
-- name: Install required packages with forced dnf
-  when: build_force_dnf
-  dnf:
-    name: "{{ build__packages_common|union(build__packages) }}"
-
-- name: Cleanup package manager cache
-  command:
-    argv:
-      - "{{ ansible_pkg_mgr }}"
-      - clean
-      - all
+- name: OS_family tasks included
+  include_tasks:
+    file: "{{ build_os_family }}.yml"
 
 - name: Flavour post-install tasks included
   include_tasks:
@@ -42,17 +33,9 @@
   with_first_found:
     - files:
         - "{{ build_distribution }}-{{ build_major_version }}_post.yml"
-        - empty.yml
-    - paths:
+      skip: true
+      paths:
         - "{{ role_path }}/tasks"
-
-- name: Create locale
-  command:
-    argv:
-      - localedef
-      - --inputfile=en_US
-      - --charmap=UTF-8
-      - en_US.UTF-8
 
 - name: Create ssh host keys
   when: not build_skip_ssh_host_keys
@@ -66,17 +49,18 @@
     path: /etc/ssh/sshd_config
     regexp: '^.*Port 22.*$'
     line: 'Port {{ build_ssh_port }}'
+    create: false
 
 - name: SSH service enabled
   when: not build_skip_ssh_service
   service:
-    name: sshd
+    name: "{{ build__ssh_service_name }}"
     enabled: true
 
 - name: Create ansible user
   user:
     name: ansible
-    groups: wheel
+    groups: "{{ build__wheel_group_name }}"
 
 - name: Setup sudoer for ansible
   community.general.sudoers:

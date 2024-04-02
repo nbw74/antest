@@ -22,4 +22,63 @@
         src: build.yml.j2
         dest: build.yml
         mode: "0644"
+
+- name: Pre-build fucking damned OS image
+  hosts: localhost
+  diff: true
+
+  vars:
+    _b: "{{ build_flavours[flavour] }}"
+
+  tasks:
+    - name: Damn OS condition
+      when: _b.distribution == 'ubuntu'
+      block:
+        - name: Get existing images list
+          register: __build_podman_images
+          command:
+            argv:
+              - podman
+              - images
+              - --noheading
+              - --format
+              - !unsafe "table {{.Repository}}:{{.Tag}}"
+
+        - name: Build if notexistent
+          when: "'localhost/' ~ _b.distribution ~ ':' ~ _b.major_version ~ '.' ~ _b.minor_version not in __build_podman_images.stdout_lines"
+          block:
+            - name: FROM
+              command:
+                argv:
+                  - buildah
+                  - from
+                  - --name
+                  - damned-working-container
+                  - "{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+
+            - name: RUN
+              command:
+                argv:
+                  - buildah
+                  - run
+                  - damned-working-container
+                  - --
+                  - /bin/bash
+                  - -c
+                  - "apt-get update && apt-get --yes --no-install-recommends install python-is-python3 && apt-get clean"
+
+            - name: COMMIT
+              command:
+                argv:
+                  - buildah
+                  - commit
+                  - damned-working-container
+                  - "localhost/{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+          always:
+            - name: RM
+              command:
+                argv:
+                  - buildah
+                  - rm
+                  - damned-working-container
 ...
