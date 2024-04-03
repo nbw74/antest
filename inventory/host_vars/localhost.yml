@@ -70,6 +70,36 @@ build_flavours:
     major_version: "main"
     minor_version: !!null
 
+  oraclelinux_7:
+    os_family: redhat
+    distribution: oraclelinux
+    major_version: "7"
+    minor_version: "9"
+
+  oraclelinux_8:
+    os_family: redhat
+    distribution: oraclelinux
+    major_version: "8"
+    minor_version: "9"
+
+  oraclelinux_9:
+    os_family: redhat
+    distribution: oraclelinux
+    major_version: "9"
+    minor_version: !!null
+
+  rockylinux_8:
+    os_family: redhat
+    distribution: rockylinux
+    major_version: "8"
+    minor_version: "9"
+
+  rockylinux_9:
+    os_family: redhat
+    distribution: rockylinux
+    major_version: "9"
+    minor_version: "3"
+
   ubi_7:
     os_family: redhat
     distribution: registry.access.redhat.com/ubi7/ubi

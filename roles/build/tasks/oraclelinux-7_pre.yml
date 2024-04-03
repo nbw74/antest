@@ -1,0 +1,6 @@
+---
+- name: Pre-upgrade glibc-common
+  yum:
+    name: glibc-common
+    state: latest
+...
