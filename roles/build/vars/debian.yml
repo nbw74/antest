@@ -2,12 +2,14 @@
 build__packages_common:
   - bash-completion
   - iproute2
+  - iputils-ping
   - less
   - locales
   - ncurses-base
   - openssh-server
   - sudo
   - systemd
+  - vim
 
 build__ssh_service_name: ssh
 build__wheel_group_name: sudo

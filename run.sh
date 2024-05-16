@@ -5,6 +5,7 @@ set -o errtrace
 set -o pipefail
 
 readonly PODMAN_SUBNET=10.25.11.0/24
+readonly PODMAN_NET=10.25.11
 readonly ANTEST_PROJECT_DIR="${HOME}/projects/github/nbw74/antest"
 readonly BIN_REQUIRED="podman"
 
@@ -12,14 +13,35 @@ typeset bn=""
 bn="$(basename "$0")"
 readonly bn
 
-typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 CONTAINER_SSH_PORT=2222 POD_SSH_PORT=2222 ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0
-typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" NETWORK_PROXY=""
+typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 \
+    CONTAINER_SSH_PORT=2222 POD_SSH_PORT=2222 STATIC_IP=0 \
+    ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0 \
+    SETUP_FROM_INV=0
+
+typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" NETWORK_PROXY="" STATIC_IP_STR=""
 typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 main() {
     local fn=${FUNCNAME[0]}
 
     trap 'except $LINENO' ERR
+
+    until [[ $(pwd) == "/" ]]; do
+	if [[ -d ./tests/antest ]]; then
+	    break
+	else
+	    cd .. || false
+	fi
+    done
+
+    if [[ ! -d ./tests/antest ]]; then
+	echo_err "Cannot find tests/antest dir in any catalog up in directory tree"
+	false
+    fi
+
+    if (( SETUP_FROM_INV )); then
+	POD_SSH_PORT=$(niet all.vars.antest.ssh_port ./tests/antest/inventory/hosts.yml)
+    fi
 
     local ansible_rolename=${PWD##*/}
     local ansible_rolename_norm=${ansible_rolename//_/-}
@@ -77,13 +99,16 @@ _create() {
 
 	[[ -n "$PUBLISH_FTP" && $c -gt 1 ]] && PUBLISH_FTP=""
 	[[ -n "$PUBLISH_HTTP" && $c -gt 1 ]] && PUBLISH_HTTP=""
+	(( STATIC_IP )) && STATIC_IP_STR="--ip=${PODMAN_NET}.$(( START_OCTET + c - 1 ))"
 	# shellcheck disable=SC2086
 	if ! inArray ContainersAll "$_target"; then
 	    local publish="127.0.0.$(( START_OCTET + c - 1 )):$(( POD_SSH_PORT + c - 1 )):${CONTAINER_SSH_PORT}"
 	    echo_info "Run container $_target with publish $publish"
 	    podman run -d \
+		$STATIC_IP_STR \
 		--privileged \
 		--name="$_target" \
+		--hostname="${_target}.example.com" \
 		--network="$ansible_network_name" \
 		$PUBLISH_FTP \
 		$PUBLISH_HTTP \
@@ -124,6 +149,8 @@ _run() {
 
 	export HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
     fi
+
+    source "${HOME}/venv/ansible/bin/activate"
 
     if [[ -f requirements.yml ]]; then
 	ansible-galaxy install -r requirements.yml 2>&1 | grep -F -- 'use --force' \
@@ -188,6 +215,8 @@ _rm() {
 	podman rm "$_target"
     done
 
+    pkill aardvark-dns
+
     err_warn=0
 }
 
@@ -245,18 +274,21 @@ usage() {
     echo -e "\\n    Usage: $bn [OPTION]\\n
     Options:
 
-    -a, --ssh-port <int>	set SSH port (default: 2222)
+    -a, --ssh-port <int>	set pod's SSH port (default: 2222)
+    -A <int>			container's SSH port (default: 2222)
     -c, --instances <int>	make several instances
+    -f, --static-ip		set static IP for container
+    -H, --publish-http		publish HTTP(S) ports
     -i, --inventory <path>	alternative inventory (default is tests/antest/inventory/hosts.yml)
     -I, --start-ip <int>	start from this IP address' last octet (default is 11)
-    -p, --playbook <path>	alternative playbook (default is tests/antest/site.yml)
-    -n, --prefix <string>	container name prefix (default is current directory name)
-    -H, --publish-http		publish HTTP(S) ports
-    -s, --stop			stop containers
-    -R, --remove		remove containers
     -K, --no-keep-running	stop containers after double plays
+    -n, --prefix <string>	container name prefix (default is current directory name)
     -N, --no-create		don't create containers (just run ansible on existing container)
+    -p, --playbook <path>	alternative playbook (default is tests/antest/site.yml)
     -P, --network-proxy		set HTTP_PROXY and HTTPS_PROXY environment variables
+    -q, --from-inventory	read script parameters from hosts.yml
+    -R, --remove		remove containers
+    -s, --stop			stop containers
     -V, --used-image		see 'podman images' for available images
     -h, --help			print help
 "
@@ -264,7 +296,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:A:c:i:I:p:n:FHKNP:sRV:h --longoptions ansible-port:,instances:,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,stop,remove,used-image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:A:c:fi:I:p:n:FHKNP:sRV:h --longoptions ansible-port:,instances:,static-ip,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,stop,remove,used-image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -281,6 +313,8 @@ while true; do
 	    CONTAINER_SSH_PORT=$2 ;	shift 2	;;
 	-c|--instances)
 	    INSTANCES=$2 ;	shift 2	;;
+	-f|--static-ip)
+	    STATIC_IP=1 ;	shift	;;
 	-i|--inventory)
 	    INVENTORY=$2 ;	shift 2	;;
 	-I|--start-ip)
@@ -299,10 +333,12 @@ while true; do
 	    NO_CREATE=1 ;	shift	;;
 	-P|--network-proxy)
 	    NETWORK_PROXY=$2 ;	shift 2	;;
-	-s|--stop)
-	    ACT_STOP=1 ;	shift	;;
+	-q|--from-inventory)
+	    SETUP_FROM_INV=1 ;	shift	;;
 	-R|--remove)
 	    ACT_REMOVE=1 ;	shift	;;
+	-s|--stop)
+	    ACT_STOP=1 ;	shift	;;
 	-V|--used-image)
 	    USED_IMAGE=$2 ;	shift 2	;;
 	-h|--help)

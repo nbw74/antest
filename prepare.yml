@@ -31,6 +31,7 @@
 
   vars:
     _b: "{{ build_flavours[flavour] }}"
+    _build_ubuntu_image: "{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
 
   tasks:
     - name: Damn OS condition
@@ -47,7 +48,7 @@
               - !unsafe "table {{.Repository}}:{{.Tag}}"
 
         - name: Build if notexistent
-          when: "'localhost/' ~ _b.distribution ~ ':' ~ _b.major_version ~ '.' ~ _b.minor_version not in __build_podman_images.stdout_lines"
+          when: "'localhost/' ~ _build_ubuntu_image not in __build_podman_images.stdout_lines"
           block:
             - name: FROM
               command:
@@ -56,7 +57,7 @@
                   - from
                   - --name
                   - damned-working-container
-                  - "{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+                  - "{{ _build_ubuntu_image }}"
 
             - name: RUN
               command:
@@ -75,7 +76,7 @@
                   - buildah
                   - commit
                   - damned-working-container
-                  - "localhost/{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
+                  - "localhost/{{ _build_ubuntu_image }}"
           always:
             - name: RM
               command:
