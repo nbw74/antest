@@ -3,9 +3,10 @@
 # ansible-galaxy collection install ansible.posix
 # ansible-galaxy collection install containers.podman
 ---
-- name: Run gitlab-ee container with podman
+- name: Run gitlab container with podman
   hosts: localhost
-  gather_facts: min
+  gather_subset: [ 'min' ]
+  diff: true
 
   collections:
     - ansible.posix
@@ -13,19 +14,23 @@
 
   vars:
     ansible_connection: local
-    gitlab_home: "{{ lookup('ENV', 'HOME') }}/gitlab-ee-test"
-    runner_home: "{{ lookup('ENV', 'HOME') }}/gitlab-ee-test-runner"
+    gitlab_flavour: ce
+    gitlab_server_image: "docker.io/gitlab/gitlab-ce:17.0.3-ce.0"
+    gitlab_runner_image: "docker.io/gitlab/gitlab-runner:alpine-v16.11.2"
+    gitlab_home: "{{ lookup('env', 'HOME') }}/gitlab-{{ gitlab_flavour }}-test"
+    runner_home: "{{ lookup('env', 'HOME') }}/gitlab-{{ gitlab_flavour }}-test-runner"
     runner_concurrency: "10"
     run_gitlab_set_sysctl: false
-    run_gitlab_state: started
+    run_gitlab_state: undefined
     runner_name: shell.samepod.localhost
 
   tasks:
     - name: Define complex
+      when: run_gitlab_state in [ 'started', 'stopped' ]
       block:
         - name: Define network
           podman_network:
-            name: gitlab-ee-test
+            name: "gitlab-{{ gitlab_flavour }}-test"
             subnet: 10.20.30.0/24
 
         - name: Create dirs
@@ -39,65 +44,69 @@
             - "{{ runner_home }}/config"
 
         - name: Set sysctl port range start
+          when: run_gitlab_set_sysctl
           become: true
           sysctl:
             name: net.ipv4.ip_unprivileged_port_start
             value: '80'
             sysctl_set: true
-          when: run_gitlab_set_sysctl
 
         - name: Define pod
           podman_pod:
-            name: gitlab-ee-test
-            network: gitlab-ee-test
+            name: "gitlab-{{ gitlab_flavour }}-test"
+            network: "gitlab-{{ gitlab_flavour }}-test"
             publish:
-              - 80:80
-              - 443:443
+              - "80:80"
+              - "443:443"
               - "2222:22"
 
         - name: Manage server container
-          podman_container:
+          register: __run_gitlab_server_return
+          containers.podman.podman_container:
             name: gitlab
-            pod: gitlab-ee-test
-            image: gitlab/gitlab-ee:13.11.1-ee.0
+            pod: "gitlab-{{ gitlab_flavour }}-test"
+            image: "{{ gitlab_server_image }}"
+            state: "{{ run_gitlab_state }}"
             volume:
               - "{{ gitlab_home }}/config:/etc/gitlab"
               - "{{ gitlab_home }}/logs:/var/log/gitlab"
               - "{{ gitlab_home }}/data:/var/opt/gitlab"
-            state: "{{ run_gitlab_state }}"
-          environment:
-            GITLAB_OMNIBUS_CONFIG: >-
-              prometheus['enable'] = false;
-              alertmanager['enable'] = false;
-              node_exporter['enable'] = false;
-              redis_exporter['enable'] = false;
-              postgres_exporter['enable'] = false;
-              pgbouncer_exporter['enable'] = false;
-              gitlab_exporter['enable'] = false;
-              grafana['enable'] = false;
-          register: __run_gitlab_server_return
+            env:
+              GITLAB_OMNIBUS_CONFIG: >-
+                alertmanager['enable'] = false;
+                gitlab_exporter['enable'] = false;
+                gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0'];
+                grafana['enable'] = false;
+                node_exporter['enable'] = false;
+                pgbouncer_exporter['enable'] = false;
+                postgres_exporter['enable'] = false;
+                prometheus['enable'] = false;
+                redis_exporter['enable'] = false;
 
         - name: Manage runner container
+          register: __run_gitlab_runner_return
           podman_container:
             name: runner
-            pod: gitlab-ee-test
-            image: gitlab/gitlab-runner:alpine-v13.11.0
+            pod: "gitlab-{{ gitlab_flavour }}-test"
+            image: "{{ gitlab_runner_image }}"
+            state: "{{ run_gitlab_state }}"
             volume:
               - "{{ runner_home }}/config:/etc/gitlab-runner"
-            state: "{{ run_gitlab_state }}"
-          register: __run_gitlab_runner_return
-      when: run_gitlab_state in [ 'started', 'stopped' ]
 
     - name: Wait for GitLab API is ready
-      uri:
-        url: http://localhost/-/readiness
       register: __run_gitlab_readiness
       until: __run_gitlab_readiness.status|int == 200
       retries: 200
       delay: 5
       when: run_gitlab_state in [ 'started' ]
+      uri:
+        url: "http://localhost/-/readiness"
 
     - name: Registration block
+      delegate_to: "{{ __run_gitlab_runner_return.container.Id }}"
+      when: run_gitlab_state in [ 'started' ]
+      vars:
+        ansible_connection: podman
       block:
         - name: Install python interpreter
           raw: >
@@ -114,19 +123,20 @@
             mode: "0700"
 
         - name: Get runners list
-          command: >
-            gitlab-runner list
           register: __run_gitlab_runners_list
           changed_when: false
+          command: >
+            gitlab-runner list
 
         - name: Registration block
+          when: __run_gitlab_runners_list.stderr is not search(runner_name|string)
           block:
             - name: Obtain registration token
+              delegate_to: "{{ __run_gitlab_server_return.container.Id }}"
+              register: __run_gitlab_runner_reg_token
               command: >
                 gitlab-rails runner -e production
                 "puts Gitlab::CurrentSettings.current_application_settings.runners_registration_token"
-              register: __run_gitlab_runner_reg_token
-              delegate_to: "{{ __run_gitlab_server_return.container.Id }}"
 
             - name: Register runner if not registered
               command: >
@@ -138,7 +148,6 @@
                 RUNNER_NAME: "{{ runner_name }}"
                 RUNNER_TAG_LIST: samepod_shell
                 REGISTER_LOCKED: "false"
-          when: __run_gitlab_runners_list.stderr is not search(runner_name|string)
 
         - name: Set jobs concurrency
           lineinfile:
@@ -146,26 +155,23 @@
             regexp: 'concurrent ='
             line: "concurrent = {{ runner_concurrency|d('1') }}"
 
-      delegate_to: "{{ __run_gitlab_runner_return.container.Id }}"
-      vars:
-        ansible_connection: podman
-      when: run_gitlab_state in [ 'started' ]
-
     - name: Undefine complex
+      when: run_gitlab_state in [ 'undefined' ]
       block:
         - name: Undefine container
           podman_container:
             name: gitlab
-            pod: gitlab-ee-test
+            pod: "gitlab-{{ gitlab_flavour }}-test"
             state: absent
 
         - name: Undefine pod
           podman_pod:
-            name: gitlab-ee-test
+            name: "gitlab-{{ gitlab_flavour }}-test"
             state: absent
 
         - name: Remove dirs
           become: true
+          diff: false
           file:
             state: absent
             path: "{{ item }}"
@@ -177,7 +183,6 @@
 
         - name: Undefine network
           podman_network:
-            name: gitlab-ee-test
+            name: "gitlab-{{ gitlab_flavour }}-test"
             state: absent
-      when: run_gitlab_state in [ 'undefined' ]
 ...

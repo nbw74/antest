@@ -13,12 +13,12 @@ typeset bn=""
 bn="$(basename "$0")"
 readonly bn
 
-typeset -i err_warn=0 INSTANCES=1 KEEP_RUNNING=1 \
-    CONTAINER_SSH_PORT=2222 POD_SSH_PORT=2222 STATIC_IP=0 \
+typeset -i err_warn=0 COUNT=1 KEEP_RUNNING=1 DEFAULT_PRIVATE_KEY=0 \
+    CONTAINER_SSH_PORT=2222 SSH_PORT=2222 STATIC_IP=0 \
     ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0 \
-    SETUP_FROM_INV=0
+    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0
 
-typeset PUBLISH_FTP="" PUBLISH_HTTP="" USED_IMAGE="" NAME_PREFIX="" NETWORK_PROXY="" STATIC_IP_STR=""
+typeset IMAGE="" NAME_PREFIX="" NETWORK_PROXY="" STATIC_IP_STR="" TAGS=""
 typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
 
 main() {
@@ -38,10 +38,20 @@ main() {
 	echo_err "Cannot find tests/antest dir in any catalog up in directory tree"
 	false
     fi
+    # shellcheck disable=SC1091
+    source "${HOME}/venv/ansible/bin/activate"
+
+    local -a Setup=()
 
     if (( SETUP_FROM_INV )); then
-	POD_SSH_PORT=$(niet all.vars.antest.ssh_port ./tests/antest/inventory/hosts.yml)
+	mapfile -t Setup < <(niet -f toml all.vars.antest "$INVENTORY")
+
+	for (( c = 0; c < ${#Setup[@]} - 1 ; c++ )); do
+	    eval "$(echo "${Setup[c]}" | awk 'BEGIN { FS = "="; OFS = "=" } { gsub(/\s+/, ""); print toupper($1), $2 }')"
+	done
     fi
+
+    echo DEFAULT_PRIVATE_KEY[$DEFAULT_PRIVATE_KEY]
 
     local ansible_rolename=${PWD##*/}
     local ansible_rolename_norm=${ansible_rolename//_/-}
@@ -49,6 +59,7 @@ main() {
     local ansible_target_container="${NAME_PREFIX:-$ansible_rolename_norm}"
 
     if [[ -f "${HOME}/.config/run.sh.conf" ]]; then
+	# shellcheck disable=SC1091
 	source "${HOME}/.config/run.sh.conf"
     fi
 
@@ -59,11 +70,7 @@ main() {
 	    _create
 	fi
 
-	echo_info "Run ansible playbook (I)"
-	_run
-	read -rp "Press key to continue for second pass... " -n1 -s
-	echo
-	echo_info "Run ansible playbook (II)"
+	echo_info "Run ansible playbook"
 	_run
 
 	if (( ! KEEP_RUNNING )); then
@@ -94,15 +101,38 @@ _create() {
 	podman network create --subnet "$PODMAN_SUBNET" "$ansible_network_name"
     fi
 
-    for (( c = 1; c <= INSTANCES; c++ )); do
+    for (( c = 1; c <= COUNT; c++ )); do
 	_target="${ansible_target_container}-$c"
 
-	[[ -n "$PUBLISH_FTP" && $c -gt 1 ]] && PUBLISH_FTP=""
-	[[ -n "$PUBLISH_HTTP" && $c -gt 1 ]] && PUBLISH_HTTP=""
+	[[ $PUBLISH_FTP -gt 0 && $c -gt 1 ]] && PUBLISH_FTP=0
+	[[ $PUBLISH_HTTP -gt 0 && $c -gt 1 ]] && PUBLISH_HTTP=0
+
+	local -a publish_http=() publish_ftp=()
+
+	if (( PUBLISH_HTTP )); then
+	    publish_http=(
+		"--publish"
+		"0.0.0.0:80:80"
+		"--publish"
+		"0.0.0.0:443:443"
+	    )
+	fi
+
+	if (( PUBLISH_FTP )); then
+	    publish_ftp=(
+		"--publish"
+		"0.0.0.0:20:20"
+		"--publish"
+		"0.0.0.0:21:21"
+		"--publish"
+		"0.0.0.0:49900-50000:49900-50000"
+	    )
+	fi
+
 	(( STATIC_IP )) && STATIC_IP_STR="--ip=${PODMAN_NET}.$(( START_OCTET + c - 1 ))"
 	# shellcheck disable=SC2086
 	if ! inArray ContainersAll "$_target"; then
-	    local publish="127.0.0.$(( START_OCTET + c - 1 )):$(( POD_SSH_PORT + c - 1 )):${CONTAINER_SSH_PORT}"
+	    local publish="127.0.0.$(( START_OCTET + c - 1 )):$(( SSH_PORT + c - 1 )):${CONTAINER_SSH_PORT}"
 	    echo_info "Run container $_target with publish $publish"
 	    podman run -d \
 		$STATIC_IP_STR \
@@ -110,10 +140,10 @@ _create() {
 		--name="$_target" \
 		--hostname="${_target}.example.com" \
 		--network="$ansible_network_name" \
-		$PUBLISH_FTP \
-		$PUBLISH_HTTP \
+		"${publish_ftp[@]}" \
+		"${publish_http[@]}" \
 		--publish "$publish" \
-		"localhost/$USED_IMAGE"
+		"localhost/$IMAGE"
 	    sleep 2
 	fi
     done
@@ -121,7 +151,7 @@ _create() {
     # shellcheck disable=SC2034
     mapfile -t ContainersRunning < <(podman ps --format="{{.Names}}")
 
-    for (( c = 1; c <= INSTANCES; c++ )); do
+    for (( c = 1; c <= COUNT; c++ )); do
 	_target="${ansible_target_container}-$c"
 
 	if ! inArray ContainersRunning "$_target"; then
@@ -150,8 +180,6 @@ _run() {
 	export HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
     fi
 
-    source "${HOME}/venv/ansible/bin/activate"
-
     if [[ -f requirements.yml ]]; then
 	ansible-galaxy install -r requirements.yml 2>&1 | grep -F -- 'use --force' \
 	    && ansible-galaxy install -r requirements.yml --force
@@ -164,7 +192,7 @@ _run() {
 	"antest:centos-6"
     )
 
-    if inArray oldSSH "$USED_IMAGE"; then
+    if inArray oldSSH "$IMAGE"; then
 	ssh_key_type=dsa
     else
 	ssh_key_type=ed25519
@@ -179,22 +207,34 @@ _run() {
     export ANSIBLE_INVENTORY
 
     local extra_vars=""
+    local tags=""
 
     if [[ -f vars.local ]]; then
 	extra_vars="-e @vars.local"
     fi
+
+    if [[ -n "$TAGS" ]]; then
+	tags="-t $TAGS"
+    fi
+
+    local default_private_key="--private-key ${ANTEST_PROJECT_DIR}/id_$ssh_key_type"
+
+    if (( DEFAULT_PRIVATE_KEY )); then
+	default_private_key=""
+    fi
+
     # shellcheck disable=SC2086
     ansible-playbook $PLAYBOOK -b -u ansible \
-	--private-key "${ANTEST_PROJECT_DIR}/id_$ssh_key_type" \
+	$default_private_key \
 	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
-	$extra_vars
+	$extra_vars $tags
 }
 
 _stop() {
     local fn=${FUNCNAME[0]}
     err_warn=1
 
-    for (( c = 1; c <= INSTANCES; c++ )); do
+    for (( c = 1; c <= COUNT; c++ )); do
 	_target="${ansible_target_container}-$c"
 
 	echo_info "Stop container '$_target'"
@@ -208,7 +248,7 @@ _rm() {
     local fn=${FUNCNAME[0]}
     err_warn=1
 
-    for (( c = 1; c <= INSTANCES; c++ )); do
+    for (( c = 1; c <= COUNT; c++ )); do
 	_target="${ansible_target_container}-$c"
 
 	echo_info "Remove container '$_target'"
@@ -250,8 +290,8 @@ checks() {
         fi
     done
 
-    if [[ ${USED_IMAGE:-nop} == "nop" ]]; then
-	echo "Required parameter '--used-image' is missing" >&2
+    if [[ ${IMAGE:-nop} == "nop" ]]; then
+	echo "Required parameter '--image' is missing" >&2
 	false
     fi
 }
@@ -276,27 +316,28 @@ usage() {
 
     -a, --ssh-port <int>	set pod's SSH port (default: 2222)
     -A <int>			container's SSH port (default: 2222)
-    -c, --instances <int>	make several instances
+    -c, --count <int>		launch several instances
     -f, --static-ip		set static IP for container
     -H, --publish-http		publish HTTP(S) ports
     -i, --inventory <path>	alternative inventory (default is tests/antest/inventory/hosts.yml)
-    -I, --start-ip <int>	start from this IP address' last octet (default is 11)
+    -I, --start-octet <int>	start from this IP address' last octet (default is 11)
     -K, --no-keep-running	stop containers after double plays
-    -n, --prefix <string>	container name prefix (default is current directory name)
+    -n, --name-prefix <string>	container name prefix (default is current directory name)
     -N, --no-create		don't create containers (just run ansible on existing container)
+    --default-private-key	use SSH private keys from user's profile
     -p, --playbook <path>	alternative playbook (default is tests/antest/site.yml)
     -P, --network-proxy		set HTTP_PROXY and HTTPS_PROXY environment variables
     -q, --from-inventory	read script parameters from hosts.yml
     -R, --remove		remove containers
     -s, --stop			stop containers
-    -V, --used-image		see 'podman images' for available images
+    -V, --image			see 'podman images' for available images
     -h, --help			print help
 "
 }
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:A:c:fi:I:p:n:FHKNP:sRV:h --longoptions ansible-port:,instances:,static-ip,inventory:,start-ip:,playbook:,prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,stop,remove,used-image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:A:c:fi:I:p:qn:FHKNP:st:RV:h --longoptions ansible-port:,count:,static-ip,inventory:,start-octet:,playbook:,default-private-key,name-prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,from-inventory,stop,tags:,remove,image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -308,25 +349,27 @@ unset TEMP
 while true; do
     case $1 in
 	-a|--ssh-port)
-	    POD_SSH_PORT=$2 ;	shift 2	;;
+	    SSH_PORT=$2 ;	shift 2	;;
 	-A)
 	    CONTAINER_SSH_PORT=$2 ;	shift 2	;;
-	-c|--instances)
-	    INSTANCES=$2 ;	shift 2	;;
+	-c|--count)
+	    COUNT=$2 ;	shift 2	;;
 	-f|--static-ip)
 	    STATIC_IP=1 ;	shift	;;
 	-i|--inventory)
 	    INVENTORY=$2 ;	shift 2	;;
-	-I|--start-ip)
+	-I|--start-octet)
 	    START_OCTET=$2 ;	shift 2	;;
 	-p|--playbook)
 	    PLAYBOOK=$2 ;	shift 2	;;
-	-n|--prefix)
+	--default-private-key)
+	    DEFAULT_PRIVATE_KEY=1 ; shift ;;
+	-n|--name-prefix)
 	    NAME_PREFIX=$2 ;	shift 2	;;
 	-F|--publish-ftp)
-	    PUBLISH_FTP='--publish "0.0.0.0:20:20" --publish "0.0.0.0:21:21" --publish "0.0.0.0:49900-50000:49900-50000"' ;	shift	;;
+	    PUBLISH_FTP=1;	shift	;;
 	-H|--publish-http)
-	    PUBLISH_HTTP='--publish "0.0.0.0:80:80" --publish "0.0.0.0:443:443"' ;	shift	;;
+	    PUBLISH_HTTP=1 ;	shift	;;
 	-K|--no-keep-running)
 	    KEEP_RUNNING=0 ;	shift	;;
 	-N|--no-create)
@@ -339,8 +382,10 @@ while true; do
 	    ACT_REMOVE=1 ;	shift	;;
 	-s|--stop)
 	    ACT_STOP=1 ;	shift	;;
-	-V|--used-image)
-	    USED_IMAGE=$2 ;	shift 2	;;
+	-t|--tags)
+	    TAGS=$2 ;		shift 2 ;;
+	-V|--image)
+	    IMAGE=$2 ;	shift 2	;;
 	-h|--help)
 	    usage ;		exit 0	;;
 	--)
