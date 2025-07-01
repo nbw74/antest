@@ -1,0 +1,6 @@
+---
+build__packages:
+  - glibc-locale-source
+  - procps-ng
+  - python3
+...

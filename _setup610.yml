@@ -1,0 +1,45 @@
+# vim: set ft=yaml.ansible:
+---
+- name: "Prepare centos-610 antest image"
+  hosts: centos-610
+  become: true
+  diff: true
+
+  vars:
+    pkg_mgr_makecache_enabled: false
+
+  tasks:
+    - name: First import pkg_mgr role
+      import_role:
+        name: sb.core.pkg_mgr
+
+    - name: CentOS block
+      when: ansible_distribution == "CentOS"
+      block:
+        - name: Import repo_scl role
+          import_role:
+            name: southbridge.aux.repo_scl
+
+        - name: The epel-release packages installed from extras
+          when: ansible_distribution_major_version|int == 6
+          yum:
+            name: epel-release
+            enablerepo:
+              - extras
+
+        - name: Import repo_epel role
+          import_role:
+            name: southbridge.aux.repo_epel
+
+        - name: Second import pkg_mgr role
+          import_role:
+            name: sb.core.pkg_mgr
+
+        - name: The rh-python36 packages installed from SCL
+          when: ansible_distribution_major_version|int == 6
+          yum:
+            name: rh-python36-python
+            enablerepo:
+              - centos-sclo-sclo
+              - centos-sclo-rh
+...

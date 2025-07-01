@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 
 set -o nounset
 set -o errtrace
@@ -16,7 +16,7 @@ readonly bn
 typeset -i err_warn=0 COUNT=1 KEEP_RUNNING=1 DEFAULT_PRIVATE_KEY=0 \
     CONTAINER_SSH_PORT=2222 SSH_PORT=2222 STATIC_IP=0 \
     ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0 \
-    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0
+    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0 CHECK_MODE=0
 
 typeset IMAGE="" NAME_PREFIX="" NETWORK_PROXY="" STATIC_IP_STR="" TAGS=""
 typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
@@ -47,7 +47,7 @@ main() {
 	mapfile -t Setup < <(niet -f toml all.vars.antest "$INVENTORY")
 
 	for (( c = 0; c < ${#Setup[@]} - 1 ; c++ )); do
-	    eval "$(echo "${Setup[c]}" | awk 'BEGIN { FS = "="; OFS = "=" } { gsub(/\s+/, ""); print toupper($1), $2 }')"
+	    eval "export $(echo "${Setup[c]}" | awk 'BEGIN { FS = "="; OFS = "=" } { gsub(/\s+/, ""); print toupper($1), $2 }')"
 	done
     fi
 
@@ -166,9 +166,8 @@ _run() {
     local fn=${FUNCNAME[0]}
 
     export ANSIBLE_ROLES_PATH="${PWD%/*}:${HOME}/.ansible/roles"
-    export ANSIBLE_COLLECTIONS_PATH="${HOME}/projects/sb:${HOME}/.ansible/collections"
     export ANSIBLE_HOST_KEY_CHECKING="False"
-    export ANSIBLE_STDOUT_CALLBACK=yaml
+    export ANSIBLE_PYTHON_INTERPRETER=auto
     export ANSIBLE_SSH_ARGS="-C -o ControlMaster=auto -o ControlPersist=60s -o IdentitiesOnly=yes"
 
     if [[ -n $NETWORK_PROXY ]]; then
@@ -223,8 +222,14 @@ _run() {
 	default_private_key=""
     fi
 
+    local check_mode=""
+
+    if (( CHECK_MODE )); then
+	check_mode="--check"
+    fi
+
     # shellcheck disable=SC2086
-    ansible-playbook $PLAYBOOK -b -u ansible \
+    ansible-playbook $PLAYBOOK -b -u ansible $check_mode \
 	$default_private_key \
 	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
 	$extra_vars $tags
@@ -317,6 +322,7 @@ usage() {
     -a, --ssh-port <int>	set pod's SSH port (default: 2222)
     -A <int>			container's SSH port (default: 2222)
     -c, --count <int>		launch several instances
+    -C, --check-mode		run ansible-playbook with --check option
     -f, --static-ip		set static IP for container
     -H, --publish-http		publish HTTP(S) ports
     -i, --inventory <path>	alternative inventory (default is tests/antest/inventory/hosts.yml)
@@ -337,7 +343,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:A:c:fi:I:p:qn:FHKNP:st:RV:h --longoptions ansible-port:,count:,static-ip,inventory:,start-octet:,playbook:,default-private-key,name-prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,from-inventory,stop,tags:,remove,image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:A:c:Cfi:I:p:qn:FHKNP:st:RV:h --longoptions ansible-port:,count:,check-mode,static-ip,inventory:,start-octet:,playbook:,default-private-key,name-prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,from-inventory,stop,tags:,remove,image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -352,6 +358,8 @@ while true; do
 	    SSH_PORT=$2 ;	shift 2	;;
 	-A)
 	    CONTAINER_SSH_PORT=$2 ;	shift 2	;;
+	-C|--check)
+	    CHECK_MODE=1 ;	shift	;;
 	-c|--count)
 	    COUNT=$2 ;	shift 2	;;
 	-f|--static-ip)

@@ -5,26 +5,32 @@ build_flavours:
     os_family: redhat
     distribution: almalinux
     major_version: "8"
-    minor_version: "9"
+    minor_version: "10"
 
   almalinux_8_plus:
     os_family: redhat
     distribution: almalinux
     major_version: "8"
-    minor_version: "9"
+    minor_version: "10"
     ssh_port: 2223
 
   almalinux_9:
     os_family: redhat
     distribution: almalinux
     major_version: "9"
-    minor_version: "3"
+    minor_version: "5"
+
+  almalinux_10:
+    os_family: redhat
+    distribution: almalinux
+    major_version: "10"
+    minor_version: "0"
 
   almalinux_9_plus:
     os_family: redhat
     distribution: almalinux
     major_version: "9"
-    minor_version: "3"
+    minor_version: "5"
     ssh_port: 2223
 
   amazonlinux_2:
@@ -38,6 +44,7 @@ build_flavours:
     distribution: amazonlinux
     major_version: "2023"
     minor_version: !!null
+    cmd: /sbin/sshd -D
 
   centos_6:
     os_family: redhat
@@ -50,6 +57,7 @@ build_flavours:
     distribution: centos
     major_version: "7"
     minor_version: "9.2009"
+    cmd: /sbin/sshd -D
 
   centos_7_plus:
     os_family: redhat
@@ -57,6 +65,7 @@ build_flavours:
     major_version: "7"
     minor_version: "9.2009"
     ssh_port: 2223
+    cmd: /sbin/sshd -D
 
   centos_8:
     os_family: redhat
@@ -75,6 +84,7 @@ build_flavours:
     distribution: oraclelinux
     major_version: "7"
     minor_version: "9"
+    cmd: /sbin/sshd -D
 
   oraclelinux_8:
     os_family: redhat
@@ -92,31 +102,32 @@ build_flavours:
     os_family: redhat
     distribution: rockylinux
     major_version: "8"
-    minor_version: "9"
+    minor_version: "10"
 
   rockylinux_9:
     os_family: redhat
     distribution: rockylinux
     major_version: "9"
-    minor_version: "3"
+    minor_version: "5"
 
   ubi_7:
     os_family: redhat
     distribution: registry.access.redhat.com/ubi7/ubi
     major_version: "7"
     minor_version: "9"
+    cmd: /sbin/sshd -D
 
   ubi_8:
     os_family: redhat
     distribution: registry.access.redhat.com/ubi8/ubi
     major_version: "8"
-    minor_version: "9"
+    minor_version: "10"
 
   ubi_9:
     os_family: redhat
     distribution: registry.access.redhat.com/ubi9/ubi
     major_version: "9"
-    minor_version: "3"
+    minor_version: "5"
 
   ubuntu_focal:
     os_family: debian
@@ -130,6 +141,14 @@ build_flavours:
     os_family: debian
     distribution: ubuntu
     major_version: "22"
+    minor_version: "04"
+    cmd: /lib/systemd/systemd
+    local_source: true
+
+  ubuntu_noble:
+    os_family: debian
+    distribution: ubuntu
+    major_version: "24"
     minor_version: "04"
     cmd: /lib/systemd/systemd
     local_source: true

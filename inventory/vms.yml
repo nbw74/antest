@@ -1,0 +1,12 @@
+---
+all:
+  vars:
+    ansible_ssh_user: toor
+  hosts:
+    centos7:
+      ansible_host: 192.168.122.88
+    almalinux8:
+      ansible_host: 192.168.122.205
+    almalinux9:
+      ansible_host: 192.168.122.21
+...

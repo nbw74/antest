@@ -4,6 +4,7 @@
   diff: true
 
   vars:
+    pkg_mgr_makecache_enabled: false
     ansible_bender:
 {% if _b.local_source|d(false) %}
       base_image: "localhost/{{ _b.distribution }}:{{ _b.major_version }}.{{ _b.minor_version }}"
@@ -43,6 +44,24 @@
     build_ssh_port: "{{ _b.ssh_port }}"
 {% endif %}
 
-  roles:
-    - build
+  tasks:
+{% if _b.os_family == 'RedHat' %}
+    - name: First import pkg_mgr role
+      import_role:
+        name: sb.core.pkg_mgr
+
+    - name: Import repo_scl role
+      when: ansible_distribution == "CentOS"
+      import_role:
+        name: southbridge.aux.repo_scl
+
+    - name: Second import pkg_mgr role
+      when: ansible_distribution == "CentOS"
+      import_role:
+        name: sb.core.pkg_mgr
+
+{% endif %}
+    - name: Import build role
+      import_role:
+        name: build
 ...
