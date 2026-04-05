@@ -8,7 +8,7 @@ build__packages:
   - rsyslog
   - rh-python36-python
 
-build__ssh_key: "{{ lookup('file', 'id_dsa.pub') }}"
+build__ssh_key: "{{ lookup('file', 'id_rsa.pub') }}"
 
 build_skip_ssh_host_keys: true
 ...

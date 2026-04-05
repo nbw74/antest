@@ -13,10 +13,10 @@ typeset bn=""
 bn="$(basename "$0")"
 readonly bn
 
-typeset -i err_warn=0 COUNT=1 KEEP_RUNNING=1 DEFAULT_PRIVATE_KEY=0 \
+typeset -i err_warn=0 COUNT=1 KEEP_RUNNING=0 KEEP_RUNNING_DEFAULT=1 DEFAULT_PRIVATE_KEY=0 \
     CONTAINER_SSH_PORT=2222 SSH_PORT=2222 STATIC_IP=0 \
     ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0 \
-    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0 CHECK_MODE=0
+    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0 CHECK_MODE=0 MULTI_CHECK_MODE=0
 
 typeset IMAGE="" NAME_PREFIX="" NETWORK_PROXY="" STATIC_IP_STR="" TAGS=""
 typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
@@ -73,7 +73,7 @@ main() {
 	echo_info "Run ansible playbook"
 	_run
 
-	if (( ! KEEP_RUNNING )); then
+	if (( ! KEEP_RUNNING )) && (( ! NO_CREATE )); then
 	    _stop
 	    _rm
 	fi
@@ -192,7 +192,7 @@ _run() {
     )
 
     if inArray oldSSH "$IMAGE"; then
-	ssh_key_type=dsa
+	ssh_key_type=rsa
     else
 	ssh_key_type=ed25519
     fi
@@ -224,7 +224,7 @@ _run() {
 
     local check_mode=""
 
-    if (( CHECK_MODE )); then
+    if (( CHECK_MODE )) || (( MULTI_CHECK_MODE )); then
 	check_mode="--check"
     fi
 
@@ -233,6 +233,23 @@ _run() {
 	$default_private_key \
 	--ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
 	$extra_vars $tags
+
+    if (( MULTI_CHECK_MODE )); then
+
+	sleep 5
+
+	ansible-playbook $PLAYBOOK -b -u ansible \
+	    $default_private_key \
+	    --ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
+	    $extra_vars $tags
+
+	sleep 5
+
+	ansible-playbook $PLAYBOOK -b -u ansible $check_mode \
+	    $default_private_key \
+	    --ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
+	    $extra_vars $tags
+    fi
 }
 
 _stop() {
