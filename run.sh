@@ -13,13 +13,13 @@ typeset bn=""
 bn="$(basename "$0")"
 readonly bn
 
-typeset -i err_warn=0 COUNT=1 KEEP_RUNNING=0 KEEP_RUNNING_DEFAULT=1 DEFAULT_PRIVATE_KEY=0 \
+typeset -i err_warn=0 COUNT=1 KEEP_RUNNING=0 DEFAULT_PRIVATE_KEY=0 \
     CONTAINER_SSH_PORT=2222 SSH_PORT=2222 STATIC_IP=0 \
-    ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0 \
-    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0 CHECK_MODE=0 MULTI_CHECK_MODE=0
+    ACT_STOP=0 ACT_REMOVE=0 START_OCTET=11 NO_CREATE=0 TEARDOWN=0 \
+    SETUP_FROM_INV=0 PUBLISH_FTP=0 PUBLISH_HTTP=0 PUBLISH_ZABBIX=0 CHECK_MODE=0 MULTI_CHECK_MODE=0
 
 typeset IMAGE="" NAME_PREFIX="" NETWORK_PROXY="" STATIC_IP_STR="" TAGS=""
-typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml"
+typeset INVENTORY="tests/antest/inventory/hosts.yml" PLAYBOOK="tests/antest/site.yml" TEARDOWN_PLAYBOOK="tests/antest/teardown.yml"
 
 main() {
     local fn=${FUNCNAME[0]}
@@ -63,7 +63,7 @@ main() {
 	source "${HOME}/.config/run.sh.conf"
     fi
 
-    if [[ $ACT_STOP == 0 && $ACT_REMOVE == 0 ]]; then
+    if (( ! ACT_STOP )); then
 
 	if (( ! NO_CREATE )); then
 	    checks
@@ -73,9 +73,12 @@ main() {
 	echo_info "Run ansible playbook"
 	_run
 
-	if (( ! KEEP_RUNNING )) && (( ! NO_CREATE )); then
+	if (( ! KEEP_RUNNING )); then
 	    _stop
-	    _rm
+
+	    if (( ACT_REMOVE )); then
+		_rm
+	    fi
 	fi
     else
 	_stop
@@ -106,6 +109,7 @@ _create() {
 
 	[[ $PUBLISH_FTP -gt 0 && $c -gt 1 ]] && PUBLISH_FTP=0
 	[[ $PUBLISH_HTTP -gt 0 && $c -gt 1 ]] && PUBLISH_HTTP=0
+	[[ $PUBLISH_ZABBIX -gt 0 && $c -gt 1 ]] && PUBLISH_ZABBIX=0
 
 	local -a publish_http=() publish_ftp=()
 
@@ -129,6 +133,13 @@ _create() {
 	    )
 	fi
 
+	if (( PUBLISH_ZABBIX )); then
+	    publish_zabbix=(
+		"--publish"
+		"0.0.0.0:10050:10050"
+	    )
+	fi
+
 	(( STATIC_IP )) && STATIC_IP_STR="--ip=${PODMAN_NET}.$(( START_OCTET + c - 1 ))"
 	# shellcheck disable=SC2086
 	if ! inArray ContainersAll "$_target"; then
@@ -142,6 +153,7 @@ _create() {
 		--network="$ansible_network_name" \
 		"${publish_ftp[@]}" \
 		"${publish_http[@]}" \
+		"${publish_zabbix[@]}" \
 		--publish "$publish" \
 		"localhost/$IMAGE"
 	    sleep 2
@@ -228,6 +240,10 @@ _run() {
 	check_mode="--check"
     fi
 
+    if (( TEARDOWN )); then
+	PLAYBOOK="$TEARDOWN_PLAYBOOK"
+    fi
+
     # shellcheck disable=SC2086
     ansible-playbook $PLAYBOOK -b -u ansible $check_mode \
 	$default_private_key \
@@ -238,14 +254,14 @@ _run() {
 
 	sleep 5
 
-	ansible-playbook $PLAYBOOK -b -u ansible \
+	ansible-playbook "$PLAYBOOK" -b -u ansible \
 	    $default_private_key \
 	    --ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
 	    $extra_vars $tags
 
 	sleep 5
 
-	ansible-playbook $PLAYBOOK -b -u ansible $check_mode \
+	ansible-playbook "$PLAYBOOK" -b -u ansible $check_mode \
 	    $default_private_key \
 	    --ssh-extra-args "-o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null" \
 	    $extra_vars $tags
@@ -353,6 +369,7 @@ usage() {
     -q, --from-inventory	read script parameters from hosts.yml
     -R, --remove		remove containers
     -s, --stop			stop containers
+    -T, --teardown		run teardown playbook
     -V, --image			see 'podman images' for available images
     -h, --help			print help
 "
@@ -360,7 +377,7 @@ usage() {
 # Getopts
 getopt -T; (( $? == 4 )) || { echo "incompatible getopt version" >&2; exit 4; }
 
-if ! TEMP=$(getopt -o a:A:c:Cfi:I:p:qn:FHKNP:st:RV:h --longoptions ansible-port:,count:,check-mode,static-ip,inventory:,start-octet:,playbook:,default-private-key,name-prefix:,publish-ftp,publish-http,no-keep-running,no-create,network-proxy:,from-inventory,stop,tags:,remove,image,help -n "$bn" -- "$@")
+if ! TEMP=$(getopt -o a:A:c:Cfi:I:p:qn:FHZKNP:st:TRV:h --longoptions ansible-port:,count:,check-mode,static-ip,inventory:,start-octet:,playbook:,default-private-key,name-prefix:,publish-ftp,publish-http,publish-zabbix,no-keep-running,no-create,network-proxy:,from-inventory,stop,tags:,teardown,remove,image,help -n "$bn" -- "$@")
 then
     echo "Terminating..." >&2
     exit 1
@@ -395,6 +412,8 @@ while true; do
 	    PUBLISH_FTP=1;	shift	;;
 	-H|--publish-http)
 	    PUBLISH_HTTP=1 ;	shift	;;
+	-Z|--publish-zabbix)
+	    PUBLISH_ZABBIX=1 ;	shift	;;
 	-K|--no-keep-running)
 	    KEEP_RUNNING=0 ;	shift	;;
 	-N|--no-create)
@@ -409,6 +428,8 @@ while true; do
 	    ACT_STOP=1 ;	shift	;;
 	-t|--tags)
 	    TAGS=$2 ;		shift 2 ;;
+	-T|--teardown)
+	    TEARDOWN=1 ;	shift	;;
 	-V|--image)
 	    IMAGE=$2 ;	shift 2	;;
 	-h|--help)
